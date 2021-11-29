@@ -1,3 +1,5 @@
+import os
+
 # STRINGS
 PROMPT_CMD=">>"
 PROMPT_MASTER_PW = "Enter master password: "
