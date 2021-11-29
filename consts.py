@@ -18,6 +18,16 @@ PROMPT_NEW_ENTRY_PASSWORD_2 = """<Options>
 2. Enter a pasword yourself\n
 Choose option (Enter 1 or 2): """
 PROMPT_NEW_ENTRY_PASSWORD_USER = "Enter a password for this service: "
+PROMPT_NEW_ENTRY_CONFIRM_ENTRY = """The following entry will be created.
+Please confirm your input.
+
+================ NEW ENTRY ================
+* service/domain name: {}
+* ID: {}
+* Password: {}
+===========================================
+
+Is the information above correct (y/n)? """
 
 # RESPONSE MESSAGES
 WELCOME_USER = "Welcome, {}"

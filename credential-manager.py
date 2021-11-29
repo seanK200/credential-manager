@@ -1,5 +1,5 @@
 # Imports: Python Standard Library
-import os, sys, sqlite3, base64, datetime, string
+import os, sys, sqlite3, base64, datetime
 import hashlib, getpass
 
 # 3rd-party dependencies
@@ -7,6 +7,7 @@ from cryptography.fernet import Fernet, InvalidToken
 
 # My modules
 from consts import *
+from pwgenerator import *
 
 # Generate key from plaintext password
 def generate_key(pw:str, salt=None)->tuple[bytes, bytes]:
@@ -49,11 +50,11 @@ def validate_master_pw(pw:str, pw_confirm:str)->bool:
     if pw != pw_confirm:
         print(ERROR_PW_CONFIRM)
         return False
-    if len(pw) < 6:
-        print(ERROR_PW_TOO_SHORT)
+    if len(pw) < MASTER_PW_MIN_LEN:
+        print(ERROR_PW_TOO_SHORT.format(MASTER_PW_MIN_LEN))
         return False
     for ch in pw:
-        if ch not in string.printable:
+        if ch not in PRINTABLE:
             print(ERROR_PW_UNSUPPORTED_CHARS)
             return False
     return True
@@ -107,11 +108,11 @@ def validate_username(username:str)->bool:
     if not username:
         print(ERROR_USERNAME_EMPTY)
         return False
-    if len(username) < 3:
+    if len(username) < USERNAME_MIN_LEN:
         print(ERROR_USERNAME_TOO_SHORT)
         return False
     for ch in username:
-        if ch not in string.printable:
+        if ch not in PRINTABLE:
             print(ERROR_USERNAME_UNSUPPORTED_CHARS)
             return False
     return True
@@ -226,6 +227,7 @@ def init()->tuple[bytes, bytes, Fernet, sqlite3.Connection]:
 
     return master_key, master_salt, frn, conn
 
+
 # ######## COMMANDS ########
 
 def get_cmd():
@@ -257,11 +259,92 @@ def get_cmd():
 
     return cmd, args
 
+# ######## COMMAND: NEW ########
+
+# Prompt user for service/domain name of a credential entry
+def prompt_entry_name():
+    user_input = ''
+    while not user_input:
+        user_input = input(PROPMT_NEW_ENTRY_NAME).strip()
+        if not user_input:
+            print(ERROR_NEW_ENTRY_NAME_EMPTY)
+        elif len(user_input) > 512:
+            print(ERROR_NEW_ENTRY_NAME_TOO_LONG)
+    return user_input
+
+# Prompt user for the user ID of a credential entry
+def prompt_entry_userid():
+    user_input = ''
+    while not user_input:
+        user_input = input(PROPMT_NEW_ENTRY_ID)
+        if not user_input:
+            confirm_empty = input(PROMPT_NEW_ENTRY_EMPTY_ID_CONFIRM)
+            if confirm_empty in RESPONSE_YES:
+                break
+    return user_input
+
+# Validate user's password
+def validate_entry_password(pw, pw_conf):
+    # Password and confirm match
+    if pw != pw_conf:
+        print(ERROR_PW_CONFIRM)
+        return False
+    # Too short
+    if len(pw) < USER_PW_MIN_LEN:
+        print(ERROR_PW_TOO_SHORT.format(USER_PW_MIN_LEN))
+        return False
+    # Supported characters
+    for ch in pw:
+        if ch not in PRINTABLE:
+            print(ERROR_PW_UNSUPPORTED_CHARS)
+            return False
+    return True
+
+# Prompt user for the user password fof a credential entry
+def prompt_entry_password():
+    options = ''
+    user_pw = ''
+    print(PROMPT_NEW_ENTRY_PASSWORD_1)
+    while not options:
+        options = input(PROMPT_NEW_ENTRY_PASSWORD_2).strip()
+        if not (options == '1' or options == '2'):
+            options = ''
+            print(ERROR_NEW_ENTRY_PW_INVALID_OPTIONS)
+    if options == '1':
+        # Generate password
+        print("Generating a strong password...", end=" ", flush=True)
+        user_pw = generate_strong_random_pw()
+        print("Done")
+    else:
+        user_pw_confirm = ''
+        validated = False
+        while not validated:
+            while not user_pw:
+                user_pw = getpass.getpass(PROMPT_NEW_ENTRY_PASSWORD_USER)
+            while not user_pw_confirm:
+                user_pw_confirm = getpass.getpass(PROMPT_CONFIRM_PW)
+            validated = validate_entry_password(user_pw, user_pw_confirm)
+    return user_pw
+
+
 def run_new():
-    pass
+    try:
+        print(PROMPT_NEW_ENTRY_TITLE)
+        proceed = False
+        while not proceed:
+            new_name = prompt_entry_name()
+            new_id = prompt_entry_userid()
+            new_pw = prompt_entry_password()
+            print(PROMPT_NEW_ENTRY_CONFIRM_ENTRY.format(new_name, new_id, new_pw))
+            
+    except KeyboardInterrupt:
+        return
 
 def run_view(args):
-    pass
+    try:
+        pass
+    except KeyboardInterrupt:
+        return
 
 def run_edit(args):
     pass
