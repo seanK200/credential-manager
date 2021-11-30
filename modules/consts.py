@@ -50,6 +50,10 @@ ERROR_NEW_ENTRY_NAME_EMPTY = "You must enter a non-empty service/domain name."
 ERROR_NEW_ENTRY_NAME_TOO_LONG = "A service/domain name must be shorter than 512 characters. Please try again."
 ERROR_NEW_ENTRY_PW_INVALID_OPTIONS = "Enter either 1 or 2 to select an option. Please try again."
 
+ERROR_YN_RESPONSE_INVALID = "Error: Invalid response. Enter either 'y' or 'n' as a reponse. Please try again."
+
+ERROR_KEYBOARDINTERRUPT = "Operation cancelled by user."
+
 # PATHS TO DIRECTORIES, FILES
 PATH_DATADIR = 'data'
 
