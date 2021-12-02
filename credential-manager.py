@@ -4,8 +4,13 @@ import hashlib, getpass
 from typing import Iterable
 
 # 3rd-party dependencies
-from cryptography.fernet import Fernet, InvalidToken
-import pandas
+try:
+    from cryptography.fernet import Fernet, InvalidToken
+    import pandas
+    from pyfiglet import Figlet
+except ModuleNotFoundError:
+    print(ERROR_MODULES_NOT_FOUND)
+    sys.exit(1)
 
 # Modules directory to path
 cwd = os.path.abspath(os.getcwd()) # current working directory
@@ -84,6 +89,7 @@ def format_date_from_ts(ts:int)->str:
     return dt.strftime(date_format)
 
 # ######## DATABASE UTILITIES ########
+
 def get_entries_with_name(name:str)->list[sqlite3.Row]:
     """
     Check if name already exists in DB
@@ -145,6 +151,42 @@ def print_many_entry(cur:sqlite3.Cursor, *, show_password=False):
 
     if not show_password:
         print(SHOW_PW_FLAG)
+
+def get_one_entry(show_password:bool=False, query:str='')->sqlite3.Row:
+    # Ask user for search query
+    if not query:
+        query = prompt_search_query()
+
+    # Search database for entry
+    global conn
+    chosen_row = None
+    with conn.cursor() as cur:
+        cur.execute('SELECT * FROM credentials WHERE name LIKE %?%', [query])
+        if cur.rowcount() > 1:
+            # Multiple results. Choose.
+            print(VIEW_SEARCH_RESULT.format(cur.rowcount(), query), end="\n\n")
+            print_many_entry(cur, show_password=show_password)
+            
+            # Make user pick one from the list by entry ID
+            valid_entry_ids = [row[0] for row in cur.fetchall()]
+            entry_id = prompt_entry_id(valid_entry_ids)
+            cur.execute('SELECT * FROM credentials WHERE entry_id=?', [entry_id])
+            chosen_row = cur.fetchone()
+            
+            # Print the user's choice
+            print()
+            print_one_entry(chosen_row, show_password=show_password)
+        elif cur.rowcount() > 0:
+            # Only one result. Proceed
+            print(VIEW_SEARCH_RESULT.format(cur.rowcount(), query), end="\n\n")
+            chosen_row = cur.fetchone()
+            print_one_entry(chosen_row, show_password=show_password)
+        else:
+            # Nothing found. Stop.
+            print(ERROR_VIEW_NO_SEARCH_RESULTS.format(query))
+            chosen_row = None
+    
+    return chosen_row
         
 # ######## MASTER PASSWORD ########
 
@@ -484,16 +526,31 @@ def run_new():
                 [new_name, new_id, new_pw, current_ts, current_ts]
             )
     except KeyboardInterrupt:
-        print(ERROR_KEYBOARDINTERRUPT)
+        print(ERROR_USER_ABORT)
         return
 
-def run_view(args):
+def run_view(args:list):
     try:
         # Look for view password flag
-        show_password = '-p' in args or '--show-password' in args
+        show_password = FLAG_SHOW_PW in args
+        if show_password:
+            for flg in FLAG_SHOW_PW:
+                if flg in args:
+                    args.remove(flg)
         
-        # Ask user for search query
-        query = prompt_search_query()
+        # Query is first positional argument
+        query = ''
+        for arg in args:
+            if arg[0] in QUOTATION_MARK and arg[-1] in QUOTATION_MARK:
+                query = arg[1:-1]
+                break
+            elif arg[0] != '-':
+                query = arg
+                break
+        
+        # If query was not given as arguments, ask
+        if not query:
+            query = prompt_search_query()
         
         # Search from database
         global conn
@@ -510,7 +567,7 @@ def run_view(args):
                 # Nothing found :(
                 print(ERROR_VIEW_NO_SEARCH_RESULTS.format(query))
     except KeyboardInterrupt:
-        print(ERROR_KEYBOARDINTERRUPT)
+        print(ERROR_USER_ABORT)
         return
 
 def prompt_entry_id(valid_ids:Iterable[int]=[])->int:
@@ -598,6 +655,7 @@ def prompt_edit_password():
             user_pw = getpass.getpass(PROMPT_VALUE)
             if not user_pw:
                 # Left blank. No changes
+                print(EDIT_NO_CHANGES.format("****"))
                 break
             # Confirm password
             print(PROMPT_EDIT_ENTRY_PW_CONFIRM)
@@ -612,47 +670,30 @@ def prompt_edit_password():
     
     return user_pw
 
-def get_one_entry(show_password:bool=False)->sqlite3.Row:
-    # Ask user for search query
-    query = prompt_search_query()
-
-    # Search database for entry
-    global conn
-    chosen_row = None
-    with conn.cursor() as cur:
-        cur.execute('SELECT * FROM credentials WHERE name LIKE %?%', [query])
-        if cur.rowcount() > 1:
-            # Multiple results. Choose.
-            print(VIEW_SEARCH_RESULT.format(cur.rowcount(), query), end="\n\n")
-            print_many_entry(cur, show_password=show_password)
-            
-            # Make user pick one from the list by entry ID
-            valid_entry_ids = [row[0] for row in cur.fetchall()]
-            entry_id = prompt_entry_id(valid_entry_ids)
-            cur.execute('SELECT * FROM credentials WHERE entry_id=?', [entry_id])
-            chosen_row = cur.fetchone()
-            
-            # Print the user's choice
-            print()
-            print_one_entry(chosen_row, show_password=show_password)
-        elif cur.rowcount() > 0:
-            # Only one result. Proceed
-            print(VIEW_SEARCH_RESULT.format(cur.rowcount(), query), end="\n\n")
-            chosen_row = cur.fetchone()
-            print_one_entry(chosen_row, show_password=show_password)
-        else:
-            # Nothing found. Stop.
-            print(ERROR_VIEW_NO_SEARCH_RESULTS.format(query))
-            chosen_row = None
-    
-    return chosen_row
-
 def run_edit(args):
     try:
         # Look for view password flag
-        show_password = '-p' in args or '--show-password' in args
+        show_password = FLAG_SHOW_PW in args
+        if show_password:
+            for flg in FLAG_SHOW_PW:
+                if flg in args:
+                    args.remove(flg)
+        
+        # Check if query was provided as a positional argument
+        query = ''
+        for arg in args:
+            if arg[0] in QUOTATION_MARK and arg[-1] in QUOTATION_MARK:
+                query = arg[1:-1]
+                break
+            elif arg[0] != '-':
+                query = arg
+                break
 
-        chosen_row = get_one_entry(show_password=show_password)
+        # If query was not given as arguments, ask
+        if not query:
+            query = prompt_search_query()
+
+        chosen_row = get_one_entry(show_password=show_password, query=query)
         # If search returned no results, stop.
         if not chosen_row:
             return
@@ -698,12 +739,68 @@ def run_edit(args):
             conn.execute(sql, sql_params)
 
     except KeyboardInterrupt:
-        print(ERROR_KEYBOARDINTERRUPT)
+        print(ERROR_USER_ABORT)
         return
 
 
 def run_del(args):
-    pass
+    try:
+        # Look for show password flags
+        show_password = FLAG_SHOW_PW in args
+        if show_password:
+            for flg in FLAG_SHOW_PW:
+                if flg in args:
+                    args.remove(flg)
+        
+        # Check if query was provided as a positional argument
+        query = ''
+        for arg in args:
+            if arg[0] in QUOTATION_MARK and arg[-1] in QUOTATION_MARK:
+                query = arg[1:-1]
+                break
+            elif arg[0] != '-':
+                query = arg
+                break
+
+        # If query was not given as arguments, ask
+        if not query:
+            query = prompt_search_query()
+
+        # Find an unique entry with search query
+        chosen_row = get_one_entry(show_password=show_password, query=query)
+        if not chosen_row:
+            return
+        
+        # Ask twice before continuing
+        print()
+        confirm_1 = ask_yn(PROMPT_DELETE_CONFIRM)
+        if not confirm_1:
+            print(ERROR_USER_ABORT)
+            return
+        confirm_2 = ask_yn(PROMPT_DELETE_CONFIRM_2)
+        if not confirm_2:
+            print(ERROR_USER_ABORT)
+            return
+        
+        # Perform delete
+        entry_id = chosen_row[0]
+        global conn
+        # If not initialized or not decrypted
+        if type(conn) != sqlite3.Connection:
+            print(ERROR_DELETE_NOT_INIT)
+            return
+        
+        try:
+            with conn:
+                conn.execute('DELETE FROM credentials WHERE entry_id=?', [entry_id])
+                print(SUCCESS_DELETE)
+        except sqlite3.DatabaseError:
+            # Inform user of error in case delete fails
+            print(ERROR_DELETE_FAILED)
+
+    except KeyboardInterrupt:
+        print(ERROR_USER_ABORT)
+        return
 
 def run_lock():
     pass
@@ -721,6 +818,13 @@ def run_cmd(cmd, args):
         run_lock()
 
 # ######## CLEANUP ########
+
+def display_splash():
+    f = Figlet(font='slant')
+    print(f.renderText("PYPASS"), end="\n\n")
+    print(SPLASH_WELCOME)
+    print(SPLASH_COPYRIGHT)
+    print(SPLASH_TIP, end="\n\n")
 
 def before_exit(frn:Fernet):
     # Delete master key file
@@ -741,6 +845,7 @@ def before_exit(frn:Fernet):
         print("FATAL ERROR: Could not encrypt database.")
 
 def main():
+    display_splash()
     global master_key, master_salt, frn, conn
     master_key, master_salt, frn, conn = init()
     try:

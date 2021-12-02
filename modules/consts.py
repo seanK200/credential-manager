@@ -1,5 +1,10 @@
 import os
 
+VERSION = 1.0
+SPLASH_WELCOME = f"Welcome to PyPass {VERSION}! An interactive password manager."
+SPLASH_COPYRIGHT = "Copyright 2021 Youngwoo Kim."
+SPLASH_TIP = "Enter 'help' to see the list of available commands."
+
 # USER PROMPTS
 PROMPT_CMD=">> "
 PROMPT_VALUE="> "
@@ -43,6 +48,9 @@ PROMPT_EDIT_CONFIRM_CHANGE_2 = "{} >> {}"
 PROMPT_EDIT_CONFIRM_CHANGE_3 = "Confirm (y/n) ? "
 PROMPT_EDIT_IN_PROGRESS = "Saving changes... "
 
+PROMPT_DELETE_CONFIRM = "Are you sure you want to delete the above entry (y/n)? "
+PROMPT_DELETE_CONFIRM_2 = "This action cannot be undone. Are you sure (y/n)? "
+
 # RESPONSE MESSAGES
 WELCOME_USER = "Welcome, {}"
 VIEW_SEARCH_RESULT = "Found {} entries for search '{}'."
@@ -51,8 +59,12 @@ EDIT_NO_CHANGES = "No changes. Keep original value: '{}'."
 # SUCCESS MESSAGES
 SUCCESS_NEW_MASTER_PW = "New master password successfully set."
 SUCCESS_EDIT = "All changes saved successfully."
+SUCCESS_DELETE = "Deleted credential entry from the database."
 
 # ERROR MESSAGES
+ERROR_MODULES_NOT_FOUND = "Dependencies not found. Please install dependencies with\
+     'python3 -m pip install -r requirements.txt' and try again."
+
 ERROR_PW_CONFIRM = "Passwords do not match. Please try again."
 ERROR_PW_TOO_SHORT = "A password needs to be at least {} characters long. Please try again."
 ERROR_PW_UNSUPPORTED_CHARS = "Your password contains unsupported character(s). Please try again."
@@ -76,9 +88,12 @@ ERROR_VIEW_NO_SEARCH_RESULTS = "No credentials were found for search '{}'."
 
 ERROR_EDIT_ENTRY_ID_NOT_NUMBER = "Enter a valid entry ID. An entry ID is a number. Please try again."
 
+ERROR_DELETE_NOT_INIT = "Failed to access the database. Forgot to decrypt?"
+ERROR_DELETE_FAILED = "Failed to delete credential from database."
+
 ERROR_YN_RESPONSE_INVALID = "Error: Invalid response. Enter either 'y' or 'n' as a reponse. Please try again."
 
-ERROR_KEYBOARDINTERRUPT = "Command execution was cancelled by user. Aborting..."
+ERROR_USER_ABORT = "Command execution was cancelled by user. Aborting..."
 
 
 # TIPS
@@ -129,6 +144,8 @@ CMD_LOCK = ['lock']
 CMD_EXIT = ['exit', 'quit']
 CMD_PASSWD = ['passwd'] # change master password
 
+FLAG_SHOW_PW = ['-p', '--show-password']
+
 # RESPONSES (Answer to y/n prompts)
 RESPONSE_YES = ['yes', 'y']
 RESPONSE_NO = ['no', 'n']
@@ -137,3 +154,5 @@ RESPONSE_NO = ['no', 'n']
 PRINTABLE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ\
     abcdefghijklmnopqrstuvwxyz0123456789\
         !"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'
+
+QUOTATION_MARK = ['\'', '"']
