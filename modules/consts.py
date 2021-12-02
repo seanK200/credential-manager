@@ -62,8 +62,10 @@ SUCCESS_EDIT = "All changes saved successfully."
 SUCCESS_DELETE = "Deleted credential entry from the database."
 
 # ERROR MESSAGES
-ERROR_MODULES_NOT_FOUND = "Dependencies not found. Please install dependencies with\
-     'python3 -m pip install -r requirements.txt' and try again."
+ERROR_INIT_MISSING_SALT = 'Cannot unlock database due to missing key file. Stopping...'
+
+ERROR_MODULES_NOT_FOUND = "Dependencies not found. Please install dependencies with \
+'python3 -m pip install -r requirements.txt' and try again."
 
 ERROR_PW_CONFIRM = "Passwords do not match. Please try again."
 ERROR_PW_TOO_SHORT = "A password needs to be at least {} characters long. Please try again."
@@ -145,6 +147,7 @@ CMD_EXIT = ['exit', 'quit']
 CMD_PASSWD = ['passwd'] # change master password
 
 FLAG_SHOW_PW = ['-p', '--show-password']
+FLAG_ALL = ['-a', '--all']
 
 # RESPONSES (Answer to y/n prompts)
 RESPONSE_YES = ['yes', 'y']
