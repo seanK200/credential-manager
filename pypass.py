@@ -360,10 +360,16 @@ def prompt_entry_name(override_prompt:str=""):
             print(ERROR_NEW_ENTRY_NAME_TOO_LONG)
             user_name = ''
         else:
-            # check if entry with same name exsists
+            # check if entry with same name exists
             entries_with_name = get_entries_with_name(user_name)
+            # If the entry already exists,
             if entries_with_name and len(entries_with_name) > 0:
-                print(ERROR_NEW_ENTRY_ALREADY_EXISTS.format(user_name))   
+                # notify user, and
+                print(ERROR_NEW_ENTRY_ALREADY_EXISTS.format(user_name))
+                # ask user for confirmation.
+                if not ask_yn(PROMPT_NEW_ENTRY_NAME_SAME_CONFIRM):
+                    # If user aborts, ask for a new name
+                    user_name = ''
     return user_name
 
 def prompt_entry_userid(override_prompt:str=""):

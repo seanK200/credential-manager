@@ -12,6 +12,7 @@ PROMPT_DEFAULT_YN = "Continue (y/n)? "
 
 PROMPT_NEW_ENTRY_TITLE = "===== Adding new credential entry =====\n"
 PROPMT_NEW_ENTRY_NAME = "[1/3] Enter service/domain name: "
+PROMPT_NEW_ENTRY_NAME_SAME_CONFIRM = "Are you sure you want to use this name (y/n)? "
 PROPMT_NEW_ENTRY_ID = "[2/3] Enter your user ID: "
 PROMPT_NEW_ENTRY_EMPTY_ID_CONFIRM = "You have not entered anything. Are you sure (y/n)? "
 PROMPT_NEW_ENTRY_PASSWORD_1 = "[3/3] Password\n"
