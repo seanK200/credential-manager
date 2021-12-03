@@ -57,6 +57,8 @@ PROMPT_DELETE_CONFIRM_2 = "This action cannot be undone. Are you sure (y/n)? "
 WELCOME_USER = "Welcome, {}"
 VIEW_SEARCH_RESULT = "Found {} entries for search '{}'."
 EDIT_NO_CHANGES = "No changes. Keep original value: '{}'."
+EDIT_NO_CHANGES_AT_ALL = "No changes made to entry. Keeping all original data."
+EDIT_DB_UPDATE_IN_PROGRES = "Saving changes to database..."
 
 # SUCCESS MESSAGES
 SUCCESS_NEW_MASTER_PW = "New master password successfully set."

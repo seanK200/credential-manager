@@ -719,9 +719,15 @@ def run_edit(args):
         sql += 'WHERE entry_id=?'
         sql_params.append(entry_id)
 
+        if len(to_update) == 0:
+            print(EDIT_NO_CHANGES_AT_ALL)
+            return
+
         # Execute SQL
         with conn:
+            print(EDIT_DB_UPDATE_IN_PROGRES, flush=True)
             conn.execute(sql, sql_params)
+            print(SUCCESS_EDIT)
 
     except KeyboardInterrupt:
         handle_keyboardinterrupt()
