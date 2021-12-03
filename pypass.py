@@ -12,6 +12,7 @@ sys.path.insert(0, modules_dirpath)
 from consts import *
 from pwgenerator import *
 from sqlite_queries import *
+from params import *
 
 # 3rd-party dependencies
 try:
@@ -89,6 +90,31 @@ def format_date_from_ts(ts:int)->str:
     date_format = '%Y-%m-%d %H:%M:%S'
     dt = datetime.datetime.fromtimestamp(ts)
     return dt.strftime(date_format)
+
+def handle_keyboardinterrupt():
+    print("\r", end="")
+    print(ERROR_USER_ABORT)
+    print()
+
+# ######## CLEANUP ########
+
+def before_exit(frn:Fernet, conn:sqlite3.Connection):
+    # Close database
+    if type(conn) == sqlite3.Connection:
+        conn.close()
+
+    # Encrypt database
+    if type(frn) == Fernet:
+        with open(PATH_DBFILE, "rb") as db_file:
+            decrypted = db_file.read()
+            encrypted = frn.encrypt(decrypted)
+            with open(PATH_DBFILE_ENC, "wb") as db_file_enc:
+                db_file_enc.write(encrypted)
+        # Delete decrypted database
+        if os.path.exists(PATH_DBFILE):
+            os.remove(PATH_DBFILE)
+    else:
+        print("FATAL ERROR: Could not encrypt database.")
 
 # ######## DATABASE UTILITIES ########
 
@@ -238,37 +264,6 @@ def store_master_salt(salt:bytes):
     with open(PATH_SALTFILE, "wb") as saltfile:
         saltfile.write(salt)
 
-# ######## MASTER_USERNAME ########
-
-# validate username
-def validate_username(username:str)->bool:
-    if not username:
-        print(ERROR_MASTER_USERNAME_EMPTY)
-        return False
-    if len(username) < MASTER_USERNAME_MIN_LEN:
-        print(ERROR_MASTER_USERNAME_TOO_SHORT)
-        return False
-    for ch in username:
-        if ch not in PRINTABLE:
-            print(ERROR_MASTER_USERNAME_UNSUPPORTED_CHARS)
-            return False
-    return True
-
-# Prompt user for username
-def prompt_username()->str:
-    entered = ''
-    validated = False
-    while not validated:
-        entered = input(PROMPT_MASTER_USERNAME)
-        validated = validate_username(entered)
-    return entered
-
-# Encrypt username and write to file
-def store_username(frn:Fernet, username:str):
-    username_enc = frn.encrypt(username.encode())
-    with open(PATH_MASTER_USERNAMEFILE_ENC, "wb") as username_file:
-        username_file.write(username_enc)
-
 # ######## INIT ########
 
 # Initialize program on launch
@@ -324,12 +319,12 @@ def init()->tuple[bytes, bytes, Fernet, sqlite3.Connection]:
 
     return master_key, master_salt, frn, conn
 
-# ######## COMMANDS ########
+# ######## PROMPT ########
 
-# ######## COMMAND: NEW ########
-
-# Prompt user for service/domain name of a credential entry
 def prompt_entry_name(override_prompt:str=""):
+    """
+    Prompt user for service/domain name of a credential entry
+    """
     if override_prompt:
         prompt = override_prompt
     else:
@@ -349,8 +344,10 @@ def prompt_entry_name(override_prompt:str=""):
                 print(ERROR_NEW_ENTRY_ALREADY_EXISTS.format(user_name))   
     return user_name
 
-# Prompt user for the user ID of a credential entry
 def prompt_entry_userid(override_prompt:str=""):
+    """
+    Prompt user for the user ID of a credential entry
+    """
     user_id = ''
     if override_prompt:
         prompt = override_prompt
@@ -367,8 +364,10 @@ def prompt_entry_userid(override_prompt:str=""):
             user_id = ''
     return user_id
 
-# Validate user's password
 def validate_entry_password(pw, pw_conf):
+    """
+    Validate user's password
+    """
     # Password and confirm match
     if pw != pw_conf:
         print(ERROR_PW_CONFIRM)
@@ -416,6 +415,9 @@ def prompt_entry_password():
     return user_pw
 
 def prompt_search_query():
+    """
+    Prompt user for a search query
+    """
     query = ''
     while not query:
         query = input(PROMPT_SEARCH_QUERY).strip()
@@ -427,87 +429,6 @@ def prompt_search_query():
             print(ERROR_VIEW_QUERY_TOO_SHORT.format(SEARCH_QUERY_MAX_LEN))
             query = ''
     return query
-
-def run_new():
-    """
-    Runs the command "new" to add a new credential entry into the database
-    """
-    global frn, conn
-    try:
-        print(PROMPT_NEW_ENTRY_TITLE)
-        continue_confirmed = False
-        while not continue_confirmed:
-            new_name = prompt_entry_name()
-            new_id = prompt_entry_userid()
-            new_pw = prompt_entry_password()
-            continue_confirmed = ask_yn(PROMPT_NEW_ENTRY_CONFIRM_ENTRY.format(new_name, new_id, new_pw))
-        # Encrypt Password
-        new_pw_enc = frn.encrypt(new_pw.encode())
-        # Current timestamp
-        current_ts = get_current_ts()
-        # TODO add entry to database
-        with conn:
-            conn.execute(
-                'INSERT INTO credentials(name, user_id, user_pw, date_created, date_modified) VALUES (?, ?, ?, ?, ?)', 
-                [new_name, new_id, new_pw_enc, current_ts, current_ts]
-            )
-    except KeyboardInterrupt:
-        print(ERROR_USER_ABORT)
-        return
-
-def run_view(args:list):
-    global conn
-    try:
-        # Options
-        show_password = False
-        show_all = False
-
-        # Parse arguments for options
-        for arg in args:
-            if arg in FLAG_SHOW_PW:
-                show_password = True
-            elif arg in FLAG_ALL:
-                show_all = True
-        
-        if show_all:
-            with conn:
-                cur = conn.cursor()
-                cur.execute('SELECT * FROM credentials')
-                print_many_entry(cur, show_password=show_password)
-            return
-
-        # Query is first positional argument
-        query = ''
-        for arg in args:
-            if arg[0] in QUOTATION_MARK and arg[-1] in QUOTATION_MARK:
-                query = arg[1:-1]
-                break
-            elif arg[0] != '-':
-                query = arg
-                break
-        
-        # If query was not given as arguments, ask
-        if not query:
-            query = prompt_search_query()
-        
-        # Search from database
-        with conn:
-            cur = conn.cursor()
-            cur.execute('SELECT * FROM credentials WHERE name LIKE ?', [f"%{query}%"])
-            rows = cur.fetchall()
-            if len(rows) > 1:
-                print(VIEW_SEARCH_RESULT.format(len(rows), query), end="\n\n")
-                print_many_entry(cur, show_password=show_password)
-            elif len(rows) > 0:
-                # Only one entry found
-                print(VIEW_SEARCH_RESULT.format(len(rows), query), end="\n\n")
-                print_one_entry(rows[0], show_password=show_password)
-            else:
-                # Nothing found :(
-                print(ERROR_VIEW_NO_SEARCH_RESULTS.format(query))
-    except KeyboardInterrupt:
-        print(ERROR_USER_ABORT)
-        return
 
 def prompt_entry_id(valid_ids:Iterable[int]=[])->int:
     entry_id = 0
@@ -548,6 +469,7 @@ def prompt_edit_name(original_name:str=''):
             # If user says no, try again
             new_name = ''
             print()
+    print()
     return new_name
 
 def prompt_edit_userid(original_id:str=''):
@@ -571,6 +493,7 @@ def prompt_edit_userid(original_id:str=''):
             # If user says no, try again
             user_id = ''
             print()
+    print()
     return user_id
 
 def prompt_edit_password():
@@ -606,8 +529,89 @@ def prompt_edit_password():
             validated = validate_entry_password(user_pw, user_pw_confirm)
     else: # Invalid option
         print(ERROR_NEW_ENTRY_PW_INVALID_OPTIONS)
-    
+    print()
     return user_pw
+
+
+# ######## COMMANDS ########
+
+def run_new():
+    """
+    Runs the command "new" to add a new credential entry into the database
+    """
+    global frn, conn
+    try:
+        print(PROMPT_NEW_ENTRY_TITLE)
+        continue_confirmed = False
+        while not continue_confirmed:
+            new_name = prompt_entry_name()
+            new_id = prompt_entry_userid()
+            new_pw = prompt_entry_password()
+            print()
+            continue_confirmed = ask_yn(PROMPT_NEW_ENTRY_CONFIRM_ENTRY.format(new_name, new_id, new_pw))
+        # Encrypt Password
+        new_pw_enc = frn.encrypt(new_pw.encode())
+        # Current timestamp
+        current_ts = get_current_ts()
+        with conn:
+            conn.execute(SQL_INSERT_ENTRY, [new_name, new_id, new_pw_enc, current_ts, current_ts])
+    except KeyboardInterrupt:
+        handle_keyboardinterrupt()
+        return
+
+def run_view(args:list):
+    global conn
+    try:
+        # Options
+        show_password = False
+        show_all = False
+
+        # Parse arguments for options
+        for arg in args:
+            if arg in FLAG_SHOW_PW:
+                show_password = True
+            elif arg in FLAG_ALL:
+                show_all = True
+        
+        if show_all:
+            with conn:
+                cur = conn.cursor()
+                cur.execute('SELECT * FROM credentials')
+                print_many_entry(cur, show_password=show_password)
+            return
+
+        # Query is first positional argument
+        query = ''
+        for arg in args:
+            if arg[0] in QUOTATION_MARK and arg[-1] in QUOTATION_MARK:
+                query = arg[1:-1]
+                break
+            elif arg[0] != '-':
+                query = arg
+                break
+        
+        # If query was not given as arguments, ask
+        if not query:
+            query = prompt_search_query()
+        
+        # Search from database
+        with conn:
+            cur = conn.cursor()
+            cur.execute(SELECT_WHERE_NAME_LIKE, [f"%{query}%"])
+            rows = cur.fetchall()
+            if len(rows) > 1:
+                print(VIEW_SEARCH_RESULT.format(len(rows), query), end="\n\n")
+                print_many_entry(cur, show_password=show_password)
+            elif len(rows) > 0:
+                # Only one entry found
+                print(VIEW_SEARCH_RESULT.format(len(rows), query), end="\n\n")
+                print_one_entry(rows[0], show_password=show_password)
+            else:
+                # Nothing found :(
+                print(ERROR_VIEW_NO_SEARCH_RESULTS.format(query))
+    except KeyboardInterrupt:
+        handle_keyboardinterrupt()
+        return
 
 def run_edit(args):
     try:
@@ -678,9 +682,8 @@ def run_edit(args):
             conn.execute(sql, sql_params)
 
     except KeyboardInterrupt:
-        print(ERROR_USER_ABORT)
+        handle_keyboardinterrupt()
         return
-
 
 def run_del(args):
     try:
@@ -731,27 +734,33 @@ def run_del(args):
         
         try:
             with conn:
-                conn.execute('DELETE FROM credentials WHERE entry_id=?', [entry_id])
+                conn.execute(DELETE_WHERE_ENTRY_ID, [entry_id])
                 print(SUCCESS_DELETE)
         except sqlite3.DatabaseError:
             # Inform user of error in case delete fails
             print(ERROR_DELETE_FAILED)
 
     except KeyboardInterrupt:
-        print(ERROR_USER_ABORT)
+        handle_keyboardinterrupt()
         return
 
 def run_lock():
-    pass
+    print()
+    global frn, conn
+    before_exit(frn, conn)
+    init()
 
 def run_sql():
     global conn
     with conn:
         cur = conn.cursor()
-        cur.execute('SELECT * FROM credentials WHERE name LIKE ?;', [f"%{input('query: ')}%"])
+        cur.execute(SELECT_WHERE_NAME_LIKE, [f"%{input('query: ')}%"])
         rows = cur.fetchall()
         for row in rows:
             print(row)
+
+def run_passwd():
+    pass
 
 def get_cmd():
     # init
@@ -796,32 +805,18 @@ def run_cmd(cmd, args):
         run_del(args)
     elif cmd in CMD_LOCK:
         run_lock()
-    elif cmd == 'sql':
+    elif cmd in CMD_PASSWD:
+        run_passwd()
+    elif cmd == 'sql': # DEBUG
         run_sql()
     else:
         print("Unsupported command!")
-
-# ######## CLEANUP ########
 
 def display_splash():
     f = Figlet(font='slant')
     print(f.renderText("PYPASS"), end="\n\n")
     print(SPLASH_WELCOME)
     print(SPLASH_TIP, end="\n\n")
-
-def before_exit(frn:Fernet):
-    # Encrypt database
-    if type(frn) == Fernet:
-        with open(PATH_DBFILE, "rb") as db_file:
-            decrypted = db_file.read()
-            encrypted = frn.encrypt(decrypted)
-            with open(PATH_DBFILE_ENC, "wb") as db_file_enc:
-                db_file_enc.write(encrypted)
-        # Delete decrypted database
-        if os.path.exists(PATH_DBFILE):
-            os.remove(PATH_DBFILE)
-    else:
-        print("FATAL ERROR: Could not encrypt database.")
 
 def main():
     display_splash()
@@ -831,11 +826,10 @@ def main():
         cmd, args = get_cmd()
         while cmd not in CMD_EXIT:
             run_cmd(cmd, args)
+            print()
             cmd, args = get_cmd()
     finally:
-        if type(conn) == sqlite3.Connection:
-            conn.close()
-        before_exit(frn)
+        before_exit(frn, conn)
         master_key = None
         master_salt = None
 

@@ -1,10 +1,5 @@
 import os
 
-VERSION = 1.0
-SPLASH_WELCOME = f"Welcome to PyPass {VERSION}! An interactive password manager."
-SPLASH_COPYRIGHT = "Copyright 2021 Youngwoo Kim."
-SPLASH_TIP = "Enter 'help' to see the list of available commands."
-
 # USER PROMPTS
 PROMPT_CMD=">> "
 PROMPT_VALUE="> "
@@ -16,7 +11,7 @@ PROMPT_MASTER_USERNAME = "Enter username: "
 
 PROMPT_NEW_ENTRY_TITLE = "===== Adding new credential entry =====\n"
 PROPMT_NEW_ENTRY_NAME = "[1/3] Enter service/domain name: "
-PROPMT_NEW_ENTRY_ID = "[2/3] Enter your user ID/email (leave blank if there is none): "
+PROPMT_NEW_ENTRY_ID = "[2/3] Enter your user ID: "
 PROMPT_NEW_ENTRY_EMPTY_ID_CONFIRM = "You have not entered anything. Are you sure (y/n)? "
 PROMPT_NEW_ENTRY_PASSWORD_1 = "[3/3] Password\n"
 PROMPT_NEW_ENTRY_PASSWORD_2 = """<Options>
@@ -101,41 +96,6 @@ ERROR_USER_ABORT = "Command execution was cancelled by user. Aborting..."
 # TIPS
 SHOW_PW_FLAG = "(Use the '-p' or '--show-password' flag to view your password)"
 
-# PATHS TO DIRECTORIES, FILES
-PATH_DATADIR = 'data'
-
-NAME_KEYFILE = 'master.key'
-NAME_SALTFILE = 'master.salt'
-NAME_DBFILE = 'credentials.db'
-NAME_DBFILE_ENC = 'credentials.db.enc'
-NAME_MASTER_USERNAMEFILE = 'uname'
-NAME_MASTER_USERNAMEFILE_ENC = 'uname.enc'
-
-PATH_KEYFILE = os.path.join(PATH_DATADIR, NAME_KEYFILE)
-PATH_SALTFILE = os.path.join(PATH_DATADIR, NAME_SALTFILE)
-PATH_DBFILE = os.path.join(PATH_DATADIR, NAME_DBFILE)
-PATH_DBFILE_ENC = os.path.join(PATH_DATADIR, NAME_DBFILE_ENC)
-PATH_MASTER_USERNAMEFILE = os.path.join(PATH_DATADIR, NAME_MASTER_USERNAMEFILE)
-PATH_MASTER_USERNAMEFILE_ENC = os.path.join(PATH_DATADIR, NAME_MASTER_USERNAMEFILE_ENC)
-
-# PARAMETERS
-SCRYPT_R = 8
-SCRYPT_N = 2 ** 15
-SCRYPT_P = 1
-SCRYPT_MAX_MEM = 64 * 2 ** 20
-SCRYPT_DKLEN = 32
-
-MASTER_PW_MAX_ATTEMPTS = 5
-MASTER_PW_MIN_LEN = 6
-MASTER_USERNAME_MIN_LEN = 3
-
-SERVICE_NAME_MAX_LEN = 512
-USER_ID_MAX_LEN = 512
-USER_PW_MIN_LEN = 6
-
-SEARCH_QUERY_MIN_LEN = 3
-SEARCH_QUERY_MAX_LEN = 512
-
 # COMMANDS (and their aliases)
 CMD_NEW = ['new', 'n']
 CMD_VIEW = ['view', 'v', 'find']
@@ -146,6 +106,7 @@ CMD_LOCK = ['lock']
 CMD_EXIT = ['exit', 'quit']
 CMD_PASSWD = ['passwd'] # change master password
 
+# FLAGS
 FLAG_SHOW_PW = ['-p', '--show-password']
 FLAG_ALL = ['-a', '--all']
 
