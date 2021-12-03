@@ -8,6 +8,7 @@ PROMPT_CURRENT_MASTER_PW = "Enter old master password: "
 PROMPT_NEW_MASTER_PW = "Enter new master password: "
 PROMPT_CONFIRM_PW = "Re-enter password: "
 PROMPT_MASTER_USERNAME = "Enter username: "
+PROMPT_DEFAULT_YN = "Continue (y/n)? "
 
 PROMPT_NEW_ENTRY_TITLE = "===== Adding new credential entry =====\n"
 PROPMT_NEW_ENTRY_NAME = "[1/3] Enter service/domain name: "
@@ -32,11 +33,17 @@ Is the information above correct (y/n)? """
 
 PROMPT_SEARCH_QUERY = "Search database by service name: "
 
+PROMPT_EDIT_CONFIRM_CHOICE = "Do you wish to edit this entry (y/n)? "
 PROMPT_EDIT_CHOOSE_ONE = "Enter the entry ID of the item to edit: "
 TIP_KEEP_ORIGINAL = " (Leave it blank to keep original)"
 PROMPT_EDIT_ENTRY_NAME = "[1/3] Edit service name" + TIP_KEEP_ORIGINAL
 PROMPT_EDIT_ENTRY_ID = "[2/3] Edit ID" + TIP_KEEP_ORIGINAL
 PROMPT_EDIT_ENTRY_PW = "[3/3] Edit password" + TIP_KEEP_ORIGINAL
+PROMPT_EDIT_ENTRY_PW_2 = """<Options>
+1. Generate new secure password (recommended)
+2. Enter a pasword yourself
+3. No change. Keep original.\n
+Choose option (Enter 1 ~ 3): """
 PROMPT_EDIT_ENTRY_PW_CONFIRM = "Enter same value again to confirm, leave blank to try again."
 PROMPT_EDIT_CONFIRM_CHANGE_1 = "CONFIRM CHANGE"
 PROMPT_EDIT_CONFIRM_CHANGE_2 = "{} >> {}"
@@ -59,8 +66,7 @@ SUCCESS_DELETE = "Deleted credential entry from the database."
 # ERROR MESSAGES
 ERROR_INIT_MISSING_SALT = 'Cannot unlock database due to missing key file. Stopping...'
 
-ERROR_MODULES_NOT_FOUND = "Dependencies not found. Please install dependencies with \
-'python3 -m pip install -r requirements.txt' and try again."
+ERROR_MODULES_NOT_FOUND = "Dependencies not found. Please install dependencies with './install.sh' and try again."
 
 ERROR_PW_CONFIRM = "Passwords do not match. Please try again."
 ERROR_PW_TOO_SHORT = "A password needs to be at least {} characters long. Please try again."

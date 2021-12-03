@@ -33,6 +33,11 @@ conn:sqlite3.Connection = None
 
 # Generate key from plaintext password
 def generate_key(pw:str, salt=None)->tuple[bytes, bytes]:
+    """
+    Generate a key to initialize Fernet
+    If the optional salt argument is provided, use the provided salt.
+    If not, generate a random salt.
+    """
     pw_bytes = pw.encode()
     pw_salt = salt
     if not pw_salt:
@@ -43,6 +48,11 @@ def generate_key(pw:str, salt=None)->tuple[bytes, bytes]:
     return key, pw_salt
 
 def decrypt_file(frn:Fernet, filepath:str, write_to_file:bool=False)->bool:
+    """
+    Decrypt a file at a given 'filepath' using given Fernet object 'frn'.
+    If the optional 'write_to_file' argument is set to True, 
+    write the decrypted data to a new file.
+    """
     try:
         with open(filepath, "rb") as encrypted_file:
             encrypted = encrypted_file.read()
@@ -50,14 +60,19 @@ def decrypt_file(frn:Fernet, filepath:str, write_to_file:bool=False)->bool:
                 decrypted = frn.decrypt(encrypted)
                 if write_to_file:
                     decrypted_filename = ''
+                    # Change the file extension
+                    # If it already has the encrypted extension,
                     if filepath.index(".enc") >= 0:
+                        # Remove the extension.
                         decrypted_filename = os.path.basename(filepath).split(".enc")[0]
                     else:
+                        # If it doesn't, just add a decrypted extension
                         decrypted_filename = os.path.basename(filepath) + ".dec"
                     decrypted_filepath = os.path.join(PATH_DATADIR, decrypted_filename)
                     with open(decrypted_filepath, "wb") as decrypted_file:
                         decrypted_file.write(decrypted)
             except InvalidToken:
+                # Master password wrong
                 print(ERROR_MASTER_PW_WRONG)
                 return False
     except FileNotFoundError:
@@ -65,8 +80,11 @@ def decrypt_file(frn:Fernet, filepath:str, write_to_file:bool=False)->bool:
         return False
     return decrypted
 
-# Ask a yes/no question to user and get response
-def ask_yn(prompt:str)->bool:
+def ask_yn(prompt:str=PROMPT_DEFAULT_YN)->bool:
+    """
+    Ask a yes/no question to user with the given prompt and get response.
+    Returns True if the user answered yes, False otherwise.
+    """
     response = ''
     while not response:
         response = input(prompt).lower()
@@ -99,6 +117,10 @@ def handle_keyboardinterrupt():
 # ######## CLEANUP ########
 
 def before_exit(frn:Fernet, conn:sqlite3.Connection):
+    """
+    Code to execute before termination of application. 
+    Encrypt the database and delete decrypted file.
+    """
     # Close database
     if type(conn) == sqlite3.Connection:
         conn.close()
@@ -496,11 +518,21 @@ def prompt_edit_userid(original_id:str=''):
     print()
     return user_id
 
-def prompt_edit_password():
+def prompt_edit_password(ori_user_pw_bytes:bytes):
+    ori_user_pw = ''
+    global frn
+    if ori_user_pw_bytes:
+        ori_user_pw = frn.decrypt(ori_user_pw_bytes).decode()
+    else:
+        ori_user_pw = '****'
+        
+    print(PROMPT_EDIT_ENTRY_PW)
     option = ''
     while not option:
-        option = input(PROMPT_NEW_ENTRY_PASSWORD_2).strip()
-        if not (option == '1' or option == '2'):
+        option = input(PROMPT_EDIT_ENTRY_PW_2).strip()
+        if option == '':
+            option = '3'
+        if not (option == '1' or option == '2' or option == '3'):
             print(ERROR_NEW_ENTRY_PW_INVALID_OPTIONS)
             option = ''
     
@@ -517,16 +549,19 @@ def prompt_edit_password():
             user_pw = getpass.getpass(PROMPT_VALUE)
             if not user_pw:
                 # Left blank. No changes
-                print(EDIT_NO_CHANGES.format("****"))
+                print(EDIT_NO_CHANGES.format(ori_user_pw))
                 break
             # Confirm password
             print(PROMPT_EDIT_ENTRY_PW_CONFIRM)
             user_pw_confirm = getpass.getpass(PROMPT_VALUE)
             if not user_pw_confirm:
                 # Left blank. No changes
-                print(EDIT_NO_CHANGES.format("****"))
+                print(EDIT_NO_CHANGES.format(ori_user_pw))
                 break
             validated = validate_entry_password(user_pw, user_pw_confirm)
+    elif option == '3':
+        user_pw = ''
+        print(EDIT_NO_CHANGES.format(ori_user_pw))
     else: # Invalid option
         print(ERROR_NEW_ENTRY_PW_INVALID_OPTIONS)
     print()
@@ -641,15 +676,22 @@ def run_edit(args):
         if not chosen_row:
             return
         
+        confirm_choice = ask_yn(PROMPT_EDIT_CONFIRM_CHOICE)
+        if not confirm_choice:
+            return
+        
         # Execute edit job
         print()
         entry_id = chosen_row[0]
         ori_name = chosen_row[1]
         ori_user_id = chosen_row[2]
+        ori_user_pw = b''
+        if show_password:
+            ori_user_pw = chosen_row[3]
 
         new_name = prompt_edit_name(ori_name)
         new_user_id = prompt_edit_userid(ori_user_id)
-        new_user_pw = prompt_edit_password()
+        new_user_pw = prompt_edit_password(ori_user_pw)
 
         # Encrypt new password, if exists
         if new_user_pw:
