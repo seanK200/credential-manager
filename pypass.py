@@ -110,7 +110,7 @@ def format_date_from_ts(ts:int)->str:
     return dt.strftime(date_format)
 
 def handle_keyboardinterrupt():
-    print("\r", end="")
+    print()
     print(ERROR_USER_ABORT)
     print()
 
