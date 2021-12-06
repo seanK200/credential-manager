@@ -175,8 +175,9 @@ def print_one_entry(row:sqlite3.Row, *, verbose=False, show_password=False):
     if not show_password:
         print(SHOW_PW_FLAG)
 
-def print_many_entry(cur:sqlite3.Cursor, *, show_password=False):
-    raw_rows = cur.fetchall()
+def print_many_entry(cur:sqlite3.Cursor, *, show_password=False, raw_rows=None):
+    if not raw_rows:
+        raw_rows = cur.fetchall()
     if len(raw_rows) == 0: return
     global frn
     cols = ['ENTRY ID', 'SERVICE NAME', 'ID', 'DATE CREATED', 'LAST MODIFIED']
@@ -217,7 +218,7 @@ def get_one_entry(show_password:bool=False, query:str='')->sqlite3.Row:
         if len(rows) > 1:
             # Multiple results. Choose.
             print(VIEW_SEARCH_RESULT.format(len(rows), query), end="\n\n")
-            print_many_entry(cur, show_password=show_password)
+            print_many_entry(cur, show_password=show_password, raw_rows=rows)
             
             # Make user pick one from the list by entry ID
             valid_entry_ids = [row[0] for row in rows]
@@ -642,7 +643,7 @@ def run_view(args:list):
             rows = cur.fetchall()
             if len(rows) > 1:
                 print(VIEW_SEARCH_RESULT.format(len(rows), query), end="\n\n")
-                print_many_entry(cur, show_password=show_password)
+                print_many_entry(cur, show_password=show_password, raw_rows=rows)
             elif len(rows) > 0:
                 # Only one entry found
                 print(VIEW_SEARCH_RESULT.format(len(rows), query), end="\n\n")
@@ -650,6 +651,7 @@ def run_view(args:list):
             else:
                 # Nothing found :(
                 print(ERROR_VIEW_NO_SEARCH_RESULTS.format(query))
+            cur.close()
     except KeyboardInterrupt:
         handle_keyboardinterrupt()
         return
