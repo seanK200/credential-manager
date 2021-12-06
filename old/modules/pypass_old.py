@@ -9,10 +9,10 @@ modules_dirpath = os.path.join(cwd, 'modules')
 sys.path.insert(0, modules_dirpath)
 
 # My modules
-from consts import *
+from consts_old import *
 from pwgenerator import *
 from sqlite_queries import *
-from params import *
+from params_old import *
 
 # 3rd-party dependencies
 try:
