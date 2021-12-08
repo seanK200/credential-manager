@@ -1,13 +1,17 @@
 # Python standard Libraries
 import os, hashlib, base64, hmac, datetime, sqlite3
-from typing import List, Union
+from sqlite3.dbapi2 import connect
+from typing import List, Union, Tuple
 
 # 3rd parties
 from cryptography.fernet import Fernet, InvalidToken
 import PyInquirer as pyinq
+from PyInquirer import prompt
 
 # Local
 from params import *
+from consts import ERROR_USER_ABORT, ERROR_DATABASE_ERROR
+from masterauth import UserAuth
 
 def generate_key(pw:str, salt=None)->tuple[bytes, bytes]:
     """
@@ -23,87 +27,6 @@ def generate_key(pw:str, salt=None)->tuple[bytes, bytes]:
         r=SCRYPT_R, p=SCRYPT_P, maxmem=SCRYPT_MAX_MEM, dklen=SCRYPT_DKLEN)
     key = base64.urlsafe_b64encode(pw_hashed)
     return key, pw_salt
-
-# Row: entry_id, name, user_id, user_pw, url, date_created, date_modified, entry_hash, entry_salt
-def sign_entry(row:list, key:bytes)->bytes:
-    """
-    Sign an entry (row of a sqlite database) using BLAKE2, and return the signature
-    """
-    entry_salt = os.urandom(hashlib.blake2b.SALT_SIZE)
-    h = hashlib.blake2b(digest_size=64, key=key, salt=entry_salt)
-    
-    # hash except hash and salt columns
-    if len(row) == 9:
-        row = row[:-2]
-    
-    # Validate row
-    if len(row) != 7:
-        raise ValueError("pypass.helpers.sign_entry(): row length must be either 9 or 7.")
-    
-    for column in row:
-        h.update(column)
-    
-    return h.hexdigest().encode(HASH_ENCODING)
-
-def verify_entry(row:list, key:bytes)->bool:
-    """
-    Verify the signature of a credential entry, and returns verification result
-    """
-    # Validate row
-    if len(row) != 9:
-        raise ValueError("pypass.helpers.verify_entry(): row length must be 9.")
-    
-    entry_hash = row[7]
-    entry_salt = row[8]
-    row = row[:-2]
-
-    h = hashlib.blake2b(digest_size=64, key=key, salt=entry_salt)
-    for column in row:
-        h.update(column)
-    good_hash = h.hexdigest().encode(HASH_ENCODING)
-    
-    return hmac.compare_digest(entry_hash, good_hash)
-
-def fencrypt(payload:Union[bytes, str], frn:Fernet=None, *, key:bytes=b''):
-    """
-    Encrypt the payload data with a given Fernet object (or a key).
-    Either the Fernet object or the key must be specified.
-    If the given payload data is a string type, encode it.
-    """
-    if not frn:
-        if not key:
-            raise ValueError("pypass.helpers.fencrypt: \
-                Key must be specified when a Fernet object is not given.")
-        frn = Fernet(key)
-
-    if type(payload) == str:
-        payload = payload.encode(HASH_ENCODING)
-
-    return frn.encrypt(payload)
-
-def fdecrypt(encrypted_payload:bytes, frn:Fernet=None, *, key:bytes=b'', decode=False)->bytes:
-    """
-    Decrypt an encrypted data with a given Fernet object (or a key).
-    Either the Fernet object or the key must be specified.
-    Returns the decrypted bytes object, or an empty bytes object 
-    (falsy) when decryption fails
-    """
-    decrypted_data = b''
-    if not frn:
-        if not key:
-            raise ValueError("pypass.helpers.fencrypt: \
-                Key must be specified when a Fernet object is not given.")
-        frn = Fernet(key)
-    
-    try:
-        decrypted_data = frn.decrypt(encrypted_payload)
-    except InvalidToken:
-        decrypted_data = b''
-    
-    if decode:
-        decrypted_data = decrypted_data.decode(HASH_ENCODING)
-    
-    return decrypted_data
 
 def get_current_ts()->int:
     """
@@ -133,26 +56,141 @@ def ask_yn(prompt_msg:str, default_ans:False)->bool:
     ans = pyinq.prompt(question)
     return ans[question]
 
+def handle_keyboard_interrupt():
+    print()
+    print(ERROR_USER_ABORT)
+
 # ######### DB HELPERS #########
 
-def db_connect():
-    db_filepath = os.path.join(DATA_DNAME, DB_FNAME)
-    return sqlite3.connect(db_filepath)
-
-def db_init(conn:sqlite3.Connection):
+def db_create_table(conn:sqlite3.Connection, table_name:str, cols:dict, if_not_exists:bool=True):
+    # Construct SQL query
+    sql = 'CREATE TABLE '
+    if if_not_exists:
+        sql += 'IF NOT EXISTS '
+    sql += table_name
+    sql += '('
+    sql_cols = ''
+    for col_name in cols:
+        sql_cols += col_name + ' '
+        sql_cols += cols[col_name].type
+        sql_cols += ', '
+    # Remove the last trailing comma
+    sql += sql_cols[:-2]
+    sql += ')'
+    # and execute
     with conn:
-        conn.execute()
+        cur = conn.cursor()
+        cur.execute(sql)
+        cur.close()
 
-def row_to_dict(row:list)->dict:
+def db_connect(username, *, init=False):
+    db_filename = username + DB_FILE_EXT
+    db_filepath = os.path.join(DATA_DNAME, db_filename)
+    conn = sqlite3.connect(db_filepath)
+    if init:
+        db_create_table(conn, DB_TABLE, DB_COLUMNS)
+    return conn
+
+def db_add_entry(user_auth:UserAuth,\
+     name:str, user_id:str, user_pw:str, url:str=''):
+    """
+    Add an entry into the credentials database, and returns the inserted row.
+    If insertion fails, return None.
+    """
+    # SQL Query
+    sql = f'INSERT INTO {DB_TABLE}'
+    sql += '(name, user_id, user_pw, url, date_created, date_modified) '
+    sql += 'VALUES(?, ?, ?, ?, ?, ?, ?)'
+
+    # Params
+    user_id_enc = user_auth.encrypt(user_id)
+    user_pw_enc = user_auth.encrypt(user_pw)
+    current_ts = get_current_ts()
+    sql_params = [name, user_id_enc, user_pw_enc, url, current_ts, current_ts]
+
+    entry_id = -1
+    # Run SQL
+    try:
+        with user_auth.conn as conn:
+            cur = conn.cursor()
+            cur.execute(sql, sql_params)
+            entry_id = cur.lastrowid
+            cur.close()
+    except sqlite3.DatabaseError:
+        return False
+    
+    # Sign the entry
+    user_auth.sign_entry(entry_id, update_db=True)
+
+    return True
+
+def db_update_entry(user_auth:UserAuth, entry_id:int, name:str='', user_id:str='', user_pw:str='', url:str=''):
+    to_update = {}
+    if name: to_update['name'] = name
+    if user_id: to_update['user_id'] = user_id
+    if user_pw: to_update['user_pw'] = user_pw
+    if url: to_update['url'] = url
+    
+    # Quit if nothing to update
+    if len(to_update) == 0: return False
+
+    # Construct query
+    sql = f'UPDATE {DB_TABLE} SET '
+    sql_params = []
+    for k, v in to_update.items():
+        sql += f"{k}=?, "
+        sql_params.append(v)
+    sql = sql[:-2] # Drop last trailing comma
+    sql += 'WHERE entry_id=?'
+    sql_params.append(entry_id)
+
+    # Execute query
+    conn = user_auth.conn
+    try:
+        with conn:
+            cur = conn.cursor()
+            cur.execute(sql, sql_params)
+            cur.close()
+    except sqlite3.DatabaseError:
+        print(ERROR_DATABASE_ERROR)
+        return False
+    
+    # Re-sign the updated entry
+    try:
+        user_auth.sign_entry(entry_id, update_db=True)
+    except sqlite3.DatabaseError:
+        print(ERROR_DATABASE_ERROR)
+        return False
+
+    return True
+
+def db_delete_entry(user_auth:UserAuth, entry_id:int):
+    sql = f'DELETE FROM {DB_TABLE} WHERE entry_id=?'
+    try:
+        with user_auth.conn as conn:
+            cur = conn.cursor()
+            cur.execute(sql, [entry_id])
+            cur.close()
+    except sqlite3.DatabaseError:
+        print(ERROR_DATABASE_ERROR)
+        raise # DEBUG
+        # return False
+    
+    return True
+
+def row_to_dict(row:list, cols=DB_COLUMNS)->dict:
     """
     Convert a database row to a dictionary for easy access
     """
+    if type(row) == dict:
+        return row
+
     row_dict = dict()
-    for col_name in DB_COLUMNS:
-        row_dict[col_name] = row[DB_COLUMNS[col_name].index]
+    for col_name in cols:
+        row_dict[col_name] = row[cols[col_name].index]
     return row_dict
 
-def decrypt_row(row, frn:Fernet, decrypt_pw=False, to_dict=False):
+def decrypt_row(row, user_auth:UserAuth, decrypt_pw=False, to_dict=False):
     """
     Decrypts a row of credentials database.
     """
@@ -161,14 +199,14 @@ def decrypt_row(row, frn:Fernet, decrypt_pw=False, to_dict=False):
     for col_name, col_value in row.items():
         decrypt_needed = DB_COLUMNS[col_name].encrypted and (decrypt_pw or col_name != 'user_pw')
         if decrypt_needed:
-            d_row.append(fdecrypt(col_value, frn, decode=True))
+            d_row.append(user_auth.decrypt(col_value).decode())
         else:
             d_row.append(col_value)
     if to_dict:
         row_to_dict(d_row)
     return d_row
 
-def prompt_choose_one_entry(rows:List[sqlite3.Row], frn:Fernet, *, return_entry_id_only=False)->sqlite3.Row:
+def prompt_choose_one_entry(rows:list, user_auth:UserAuth, *, return_entry_id_only=False)->sqlite3.Row:
     """
     Takes multiple rows obtained from a sqlite3 query as input, 
     and prompts the user to select one. Returns the selected row.
@@ -181,7 +219,7 @@ def prompt_choose_one_entry(rows:List[sqlite3.Row], frn:Fernet, *, return_entry_
     for row in rows:
         row = row_to_dict(row)
         # e.g. Github (userid001)
-        row_to_txt = f"{row['name']} ({fdecrypt(row['user_id'], frn, decode=True)})"
+        row_to_txt = f"{row['name']} ({user_auth.decrypt(row['user_id']).decode()})"
         prompt_list[row_to_txt] = row['entry_id']
 
     # Ask user
@@ -206,7 +244,19 @@ def prompt_choose_one_entry(rows:List[sqlite3.Row], frn:Fernet, *, return_entry_
     
     return chosen_row
 
-def get_multiple_entries(conn:sqlite3.Connection, frn: Fernet, query:str='', *, query_by:str='', decrypt=False):
+def get_multiple_entries(user_auth:UserAuth, query:str='', *, query_by:str='', decrypt=False):
+    # If no query is supplied, ask.
+    if not query:
+        search_query_question = [
+            {
+                'type':'input',
+                'name':'query',
+                'message':'Enter search query:',
+                'validate': lambda answer: len(answer) > 0 and len(answer) < 128
+            }
+        ]
+        query = prompt(search_query_question)['query']
+
     # Construct SQL query
     sql = f'SELECT * FROM {DB_TABLE}'
     sql_params = []
@@ -223,10 +273,12 @@ def get_multiple_entries(conn:sqlite3.Connection, frn: Fernet, query:str='', *, 
             else:
                 raise ValueError(f"helpers.get_multiple_entries(): \
                     Invalid query_by '{query_by}'.")
+    else:
+        raise ValueError("helpers.get_multiple_entries(): Empty query")
     
     # Execute the query
     try:
-        with conn:
+        with user_auth.conn as conn:
             cur = conn.cursor()
             if sql_params:
                 cur.execute(sql, sql_params)
@@ -244,23 +296,25 @@ def get_multiple_entries(conn:sqlite3.Connection, frn: Fernet, query:str='', *, 
     if decrypt:
         decrypted_rows = []
         for row in rows:
-            decrypted_rows.append(decrypt_row(row, frn))
+            decrypted_rows.append(decrypt_row(row, user_auth))
         return decrypted_rows
 
     return rows
 
-def get_one_entry(conn:sqlite3.Connection, frn:Fernet, query:str, *, query_by:str='', return_entry_id_only=False):
+def get_one_entry(user_auth:UserAuth, query:str, *, \
+    query_by:str='', decrypt:bool=False, decrypt_pw:bool=False, \
+        return_entry_id_only=False, to_dict=False):
     """
     Run query on database and retrive only one query. If query returns more than one rows,
     prompt user to select one.
     """
     # All the rows matching returned from DB query
-    rows = get_multiple_entries(conn, query, query_by=query_by)
+    rows = get_multiple_entries(user_auth, query, query_by=query_by)
     # The Chosen One
     row = []
 
     if len(rows) > 1:
-        row = prompt_choose_one_entry(rows, frn)
+        row = prompt_choose_one_entry(rows, user_auth)
     elif len(rows) > 0:
         row = rows[0]
     else:
@@ -268,5 +322,31 @@ def get_one_entry(conn:sqlite3.Connection, frn:Fernet, query:str, *, query_by:st
     
     if return_entry_id_only:
         return row[DB_COLUMNS['entry_id'].index]
+    
+    if decrypt:
+        row = decrypt_row(row, user_auth, decrypt_pw)
+
+    if to_dict:
+        row = row_to_dict(row)
+    
+    return row
+
+def get_entry_by_id(user_auth:UserAuth, entry_id:int, *, \
+    decrypt:bool=False, decrypt_pw:bool=False, to_dict=False):
+    conn = user_auth.conn
+    row = []
+    try: 
+        with conn:
+            sql = f'SELECT * FROM {DB_TABLE} WHERE entry_id=?'
+            cur = conn.cursor()
+            cur.execute(sql, [entry_id])
+            row = cur.fetchone()
+            cur.close()
+    except sqlite3.DatabaseError:
+        print(ERROR_DATABASE_ERROR)
+        row = []
+    
+    if decrypt:
+        row = decrypt_row(row, user_auth, decrypt_pw, to_dict=to_dict)
     
     return row

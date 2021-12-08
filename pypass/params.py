@@ -9,7 +9,7 @@ SCRYPT_DKLEN = 32
 HASH_ENCODING = 'utf-8'
 
 # DB
-DB_FNAME = 'credentials.db'
+DB_FILE_EXT = '.db'
 DB_TABLE = 'credentials'
 DB_COLUMNS = {
     'entry_id': {
@@ -59,3 +59,44 @@ DB_COLUMNS = {
     }
 }
 DB_COLUMN_NAMES = list(DB_COLUMNS.keys())
+
+# MASTER AUTH
+KEYFILE_EXT = '.key'
+
+MASTER_USERNAME_MAX_LEN = 64
+MASTER_PW_MAX_ATTEMPTS = 5
+MASTER_PW_MIN_LEN = 6
+
+MASTER_DB_FNAME = 'master.db'
+MASTER_DB_COLUMNS = {
+    'username': {
+        'index': 0,
+        'type': 'TEXT',
+        'encrypted': False
+    },
+    'auth_salt': {
+        'index': 1,
+        'type': 'BLOB',
+        'encrypted': False
+    },
+    'date_created': {
+        'index': 2,
+        'type': 'INTEGER',
+        'encrypted': False
+    },
+    'date_pw_change': {
+        'index': 3,
+        'type': 'INTEGER',
+        'encrypted': False
+    }
+}
+MASTER_DB_TABLE = 'pypass_users'
+
+SEARCH_QUERY_MIN_LEN = 3
+SEARCH_QUERY_MAX_LEN = 512
+
+USER_ID_MAX_LEN = 64
+USER_ID_MIN_LEN = 3
+
+USER_PW_MIN_LEN = 6
+USER_PW_MAX_LEN = 64

@@ -1,5 +1,8 @@
 import random
 
+from params import *
+from consts import *
+
 # Password generator
 ALPHABET_LOWER = 'abcdefghijklmnopqrstuvwxyz'
 ALPHABET_UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'

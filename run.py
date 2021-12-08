@@ -21,7 +21,7 @@ def need_setup():
 def main():
     if need_setup():
         pypass_setup.run_setup()
-    pypass.runner()
+    pypass.main()
 
 if __name__ == "__main__":
     main()
