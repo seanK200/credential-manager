@@ -393,6 +393,7 @@ def prompt_commands():
         'Add new entry',
         'Edit entry',
         'Delete entry',
+        'Login Wizard',
         Separator(),
         'Quit'
     ]
@@ -421,6 +422,8 @@ def run_commands(user_auth):
             result = run_edit(user_auth)
         elif command == 'Delete entry':
             result = run_delete(user_auth)
+        elif command == 'Login Wizard':
+            result = run_login_wizard(user_auth)
         elif command == 'Quit':
             result = True
     except KeyboardInterrupt:

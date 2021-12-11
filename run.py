@@ -1,4 +1,5 @@
-from pypass import pypass, params
+from pypass import pypass
+from pypass.params import DATA_DNAME
 import pypass_setup
 
 def need_setup():
@@ -13,8 +14,8 @@ def need_setup():
     
     # Data dir present?
     import os
-    if params.DATA_DIRNAME not in os.listdir("."):
-        os.mkdir(params.DATA_DIRNAME)
+    if DATA_DNAME not in os.listdir("."):
+        os.mkdir(DATA_DNAME)
     
     return False
 

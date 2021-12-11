@@ -1,48 +1,30 @@
 # Python Credential Manager
 Python Credential Manager is a local password manager, for creating, managing and using credentials for various services.
 
-## Features
+## Feature Overview
 * Encrypted storage of credential data
-* Password protection of software
 * Automatic generation of secure passwords
-* Search by domain name
+* Search by service name
+* 'Login Wizard' for auto filling of login forms
 
-## Installation
-1. 
-
-## Usage
-### 1. Adding new credentials
-
-**Usage**
+## Setup and Usage
+Run the following command in your terminal. The script will automatically install any dependencies an run the application when it is done.
 ```
->> new
+python run.py
 ```
 
-### 2. **view**: Print credential information on screen
+## Initial Run
+On the first run, enter a username and a master password, to lock/unlock data you store on PyPass.
 
-**Usage**
+## Features
+Use the arrow keys to select a feature and ENTER to execute.
 ```
->> view <domain-name>
-```
-
-### 3. **edit**: Edit credential information of particular entry
-**Usage**
-```
->> edit <domain-name>
-```
-
-### 4. **delete**: Delete credential information
-**Usage**
-```
->> delete <domain-name>
-```
-
-### 5. **list**: List all data
-```
->> list
-```
-
-### 6. **lock**: Encrypts the datafile, and prohibit data access
-```
->> lock
+Choose action:
+> View entry
+  Add new entry
+  Edit entry
+  Delete entry
+  Login Wizard
+  --------------
+  Quit
 ```
