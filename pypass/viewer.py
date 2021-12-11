@@ -1,12 +1,10 @@
 import rich
 from rich.panel import Panel
 from rich.text import Text
-# rprint(Panel("[bold]ID[/bold]: seanK200\n[bold]PW[/bold]: ****", title="Github", expand=False, padding=(0, 2)))
 
-from masterauth import UserAuth
-from helpers import *
+from pypass.helpers import *
 
-def print_credential(user_auth:UserAuth, credential, show_pw=False, verbose=False):
+def print_credential(user_auth, credential, show_pw=False, verbose=False):
     credential = decrypt_row(credential, user_auth, decrypt_pw=True, to_dict=True)
     text = Text()
     text.append("ID: ", style="bold")

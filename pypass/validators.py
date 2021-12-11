@@ -1,7 +1,7 @@
 import re
 
-from params import *
-from consts import *
+from pypass.params import *
+from pypass.consts import *
 
 # ######### GLOBALS #########
 globals_user_pw = ''

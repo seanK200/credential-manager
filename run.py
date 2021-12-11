@@ -1,6 +1,6 @@
-from pypass import pypass
-from pypass.params import DATA_DNAME
+import sys
 import pypass_setup
+from pypass.params import DATA_DNAME
 
 def need_setup():
     # deps installed?
@@ -19,10 +19,15 @@ def need_setup():
     
     return False
 
-def main():
+def run():
     if need_setup():
         pypass_setup.run_setup()
-    pypass.main()
+    try:
+        from pypass.pypass import main as pypass_main
+        pypass_main()
+    except ModuleNotFoundError:
+        print("Error: Dependencies are not installed.")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    main()
+    run()

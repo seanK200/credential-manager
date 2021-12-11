@@ -5,11 +5,11 @@ from typing import List
 from getpass import getpass
 
 # 3rd parties
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 
 # Local
-from consts import *
-from params import *
+from pypass.consts import *
+from pypass.params import *
 from pypass.helpers import *
 
 class UserAuth:
@@ -22,8 +22,16 @@ class UserAuth:
         else:
             raise ValueError("<masterauth.UserAuth> Username and master key not provided.")
 
-    def encrypt(self, data)->bytes:
-        """Encrypts the given data using the user's key"""
+    def encrypt(self, data:bytes)->bytes:
+        """
+        Encrypts the given data using the user's key
+
+        data
+            The data to encrypt. Data must either be a string or a correctly encoded bytes type.
+        
+        (Returns)
+            The encrypted data in bytes type.
+        """
         if type(data) != bytes:
             data = data.encode(HASH_ENCODING)
         return self.frn.encrypt(data)
@@ -48,7 +56,7 @@ class UserAuth:
             cur.execute(sql, sql_params)
             cur.close()
 
-    def sign_entry(self, entry_id:int=0, *, row=[], update_db:bool=False, entry_salt:bytes=b''):
+    def sign_entry(self, entry_id:int=0, *, row:list=[], update_db:bool=False, entry_salt:bytes=b''):
         """
         Sign an entry (row of a sqlite database) using BLAKE2, and return the signature
         """
@@ -161,21 +169,35 @@ def get_user_if_exists(username:str, conn:sqlite3.Connection)->list:
     
     return []
 
-def master_db_add_entry(username:str, auth_salt:bytes, \
-    date_created:int, date_pw_change:int, conn:sqlite3.Connection=None):
-    if type(conn) != sqlite3.Connection:
-        conn = master_db_connect()
+def master_db_add_entry(user_auth:UserAuth, \
+    master_conn:sqlite3.Connection, username:str, auth_salt:bytes):
+    """
+    Adds a new entry to the Pypass user database.
+
+    user_auth
+        A UserAuth class object
     
-    sql = f'INSERT INTO {MASTER_DB_TABLE}(username, auth_salt, \
-        date_created, date_pw_change) VALUES (?, ?, ?, ?)'
-    sql_params = [username, auth_salt, date_created, date_pw_change]
+    master_conn
+        A connection to the master database.
+
+    username
+        username of the new user
+    
+    auth_salt
+        Salt for hashing the user's master password
+    """
+    username_enc = user_auth.encrypt(username)
+    current_ts = get_current_ts()
+    sql = f'INSERT INTO {MASTER_DB_TABLE}(username, username_enc, auth_salt, \
+        date_created, date_pw_change) VALUES (?, ?, ?, ?, ?)'
+    sql_params = [username, username_enc, auth_salt, current_ts, current_ts]
     try:
-        with conn:
-            cur = conn.cursor()
+        with master_conn:
+            cur = master_conn.cursor()
             cur.execute(sql, sql_params)
-    except sqlite3.DatabaseError as dbe:
+    except sqlite3.DatabaseError:
         print(ERROR_CREATE_PYPASS_USER_DATABASEERROR)
-        raise dbe
+        raise
 
 # ######### Validators #########
 
@@ -246,23 +268,30 @@ def prompt_new_master_pw()->tuple[bytes, bytes]:
     pw = ''
     validated = False
     while not validated:
-        pw = getpass.getpass(PROMPT_NEW_MASTER_PW)
-        pw_confirm = getpass.getpass(PROMPT_CONFIRM_PW)
+        pw = getpass(PROMPT_NEW_MASTER_PW)
+        pw_confirm = getpass(PROMPT_CONFIRM_PW)
         validated = validate_master_pw(pw, pw_confirm)
     key, salt = generate_key(pw)
     return key, salt
 
-def create_pypass_user(username):
-    master_key, master_salt = prompt_new_master_pw()
-    current_ts = get_current_ts()
-    try:
-        master_db_add_entry(username, master_salt, current_ts, current_ts)
-        return master_key
-    except sqlite3.DatabaseError as dbe:
-        print(ERROR_CREATE_PYPASS_USER_FAIL)
-        raise dbe
+def create_pypass_user(master_conn:sqlite3.Connection, username:str):
+    """
+    Creates a new Pypass user and updates the master database.
 
-def authenticate()->List[str, bytes]:
+    username
+        Username of the new user. A user must supply this username
+        along with the password to login to Pypass.
+    """
+    master_key, master_salt = prompt_new_master_pw()
+    user_auth = UserAuth(username, master_key)
+    try:
+        master_db_add_entry(user_auth, master_conn, username, master_salt)
+        return user_auth
+    except sqlite3.DatabaseError:
+        print(ERROR_CREATE_PYPASS_USER_FAIL)
+        raise
+
+def authenticate():
     """
     Performs the master authentication, and returns a Fernet object if authentication succeeded.
     Returns literal None if authentication fails.
@@ -271,6 +300,8 @@ def authenticate()->List[str, bytes]:
     conn = master_db_connect()
     username = ''
     master_key = b''
+    user_auth = None # return value
+
     try:
         username = prompt_master_username()
         user = get_user_if_exists(username, conn)
@@ -282,14 +313,25 @@ def authenticate()->List[str, bytes]:
             master_pw = prompt_master_pw()
             # and initialize a Fernet object with it
             master_key, master_salt = generate_key(master_pw, master_salt)
+            user_auth = UserAuth(username, master_key)
+            # Attempt to decrypt
+            username_dec = user_auth.decrypt(user['username_enc'])
+            if username_dec:
+                # If decryption fails, return None and fail initialization
+                if username_dec.decode(HASH_ENCODING) != username:
+                    print(ERROR_WRONG_MASTER_PASSWORD)
+                    user_auth = None
+            else:
+                print(ERROR_WRONG_MASTER_PASSWORD)
+                user_auth = None
         else:
             # User not found
             print(ERROR_MASTER_USERNAME_DOES_NOT_EXIST.format(username))
-            create_user = ask_yn(PROMPT_MASTER_USER_CREATE)
-            if create_user:
+            # Ask if user wants to create new user
+            if ask_yn(PROMPT_MASTER_USER_CREATE):
                 try:
                     # Create a new PyPass user,
-                    master_key = create_pypass_user(username)
+                    user_auth = create_pypass_user(master_conn=conn, username=username)
                     # and initialize a Fernet object
                 except sqlite3.DatabaseError:
                     # Create user failed. (Auth failed)
@@ -307,4 +349,4 @@ def authenticate()->List[str, bytes]:
             conn.close()
         if not username:
             return None
-        return UserAuth(username, master_key)
+        return user_auth

@@ -8,12 +8,11 @@ import keyboard as kb
 from PyInquirer import prompt, Separator
 
 # Locals
-from helpers import *
-from consts import *
-from generator import generate_strong_random_pw
-from viewer import *
-from validators import *
-from masterauth import UserAuth
+from pypass.helpers import *
+from pypass.consts import *
+from pypass.generator import generate_strong_random_pw
+from pypass.viewer import *
+from pypass.validators import *
 
 MODIFIER_KEY = 'control' # Windows, linux
 if platform.system() == 'Darwin':
@@ -52,8 +51,7 @@ def prompt_search_query():
             query = ''
     return query
 
-def run_login_wizard(user_auth:UserAuth, query:str='', *, entry_id:int=0):
-    credential = {}
+def run_login_wizard(user_auth, query:str='', *, entry_id:int=0):
     try:
         if entry_id:
             credential = get_entry_by_id(user_auth, entry_id, to_dict=True)
@@ -62,15 +60,20 @@ def run_login_wizard(user_auth:UserAuth, query:str='', *, entry_id:int=0):
     except sqlite3.DatabaseError:
         return False
     
+    if not credential:
+        # Stop if not found
+        return False
+    
     user_id = user_auth.decrypt(credential['user_id']).decode(HASH_ENCODING)
     user_pw = user_auth.decrypt(credential['user_pw']).decode(HASH_ENCODING)
     url = credential['url']
     
     if url:
         # Copy URL, wait for user to paste it in
-        input(PROMPT_LOGIN_WIZARD_1_URL)
+        print(PROMPT_LOGIN_WIZARD_1_URL, end="")
         time.sleep(1)
         webbrowser.open(url)
+        input()
     
     # Wait for user to reach login page
     print(PROMPT_LOGIN_WIZARD_2_ID)
@@ -89,8 +92,11 @@ def run_login_wizard(user_auth:UserAuth, query:str='', *, entry_id:int=0):
 
     return True
 
-def run_view(user_auth:UserAuth):
+def run_view(user_auth):
     credential = get_one_entry(user_auth, prompt_search_query(), decrypt=True, to_dict=True)
+    if not credential:
+        return False
+    
     print_credential(user_auth, credential)
     actions = [
         'Copy password',
@@ -115,7 +121,7 @@ def run_view(user_auth:UserAuth):
 
         if chosen_action == 'Copy password':
             user_pw = user_auth.decrypt(credential['user_pw']).decode(HASH_ENCODING)
-            kb.copy(user_pw)
+            pc.copy(user_pw)
             print(PROMPT_PASSWORD_COPIED)
         elif chosen_action == 'View password':
             print_credential(user_auth, credential, show_pw=True)
@@ -124,15 +130,17 @@ def run_view(user_auth:UserAuth):
     
     return True
 
-def run_edit(user_auth:UserAuth):
+def run_edit(user_auth):
     # show_pw = False
     credential = get_one_entry(user_auth, prompt_search_query(), decrypt=True, to_dict=True)
+    if not credential:
+        return False
     
     # Make edit choices
     edit_choices = []
     name = credential["name"]
-    d_user_id = user_auth.decrypt(credential["user_id"]).decode(HASH_ENCODING)
-    d_user_pw = ""
+    d_user_id = credential["user_id"]
+    d_user_pw = "****"
     # if show_pw:
     #     d_user_pw = " (" + user_auth.decrypt(credential["user_pw"]).decode(HASH_ENCODING) + ")"
     url = credential["url"]
@@ -145,7 +153,7 @@ def run_edit(user_auth:UserAuth):
         'value': 'user_id'
     })
     edit_choices.append({
-        'name': f"Password{d_user_pw}",
+        'name': "Password",
         'value': 'user_pw'
     })
     edit_choices.append({
@@ -204,6 +212,7 @@ def run_edit(user_auth:UserAuth):
             'type': 'list',
             'name': 'new_pw_options',
             'message': 'New password options:',
+            'when': edit_pw,
             'choices': [
                 {
                     'name': 'Generate a strong new password',
@@ -244,6 +253,9 @@ def run_edit(user_auth:UserAuth):
     # Ask user
     answers = prompt(edit_questions)
 
+    if 'confirmed' not in answers:
+        raise KeyboardInterrupt
+
     # If user did not confirm
     if not answers['confirmed']:
         print("Edit cancelled by user. Changes are not saved.")
@@ -253,15 +265,16 @@ def run_edit(user_auth:UserAuth):
     if edit_pw_generate(answers):
         answers['new_pw'] = generate_strong_random_pw()
 
-    new_credential = {
-        'entry_id': "'" + credential['entry_id'] + "'",
-        'name': "'" + credential['name'] + "'", 
-        'user_id': "'" + credential['user_id'] + "'",
-        'user_pw': "'" + credential['user_pw'] + "'", 
-        'url': "'" + credential['url'] + "'",
-        'date_created': "'" + credential['date_created'] + "'",
-        'date_modified': "'" + credential['date_modified'] + "'",
-    }
+    # Deep copy
+    new_credential = {}
+    for k, v in credential.items():
+        new_credential[k] = v
+    
+    # Add quotation marks to fields that will be printed
+    new_credential['name'] = "'" + credential['name'] + "'"
+    new_credential['user_id'] = "'" + d_user_id + "'"
+    new_credential['user_pw'] = "'" + d_user_pw + "'"
+    new_credential['url'] = "'" + credential['url'] + "'"
 
     if edit_name(answers):
         new_credential['name'] += " >> '" + answers['new_name'] + "'"
@@ -280,7 +293,7 @@ def run_edit(user_auth:UserAuth):
     else:
         answers['new_url'] = ''
     
-    print_credential(new_credential)
+    print_credential(user_auth, new_credential, show_pw=True)
 
     edit_confirm_question = [
         {
@@ -299,11 +312,11 @@ def run_edit(user_auth:UserAuth):
 
     # Update DB
     db_update_entry(user_auth, entry_id=credential['entry_id'],\
-        name=answers['new_name'], user_id=answers['user_id'], \
-            user_pw=answers['user_pw'], url=answers['new_url'])
+        name=answers['new_name'], user_id=answers['new_id'], \
+            user_pw=answers['new_pw'], url=answers['new_url'])
     return True
 
-def run_new(user_auth:UserAuth):
+def run_new(user_auth):
     print("Adding new credential entry...")
     new_questions = [
         {
@@ -358,6 +371,7 @@ def run_new(user_auth:UserAuth):
     # Ask user
     new_answers = prompt(new_questions)
     
+    print("Saving changes...")
     # Generate password if necessary
     if new_answers['new_pw_options'] == 'generate':
         new_answers['new_pw'] = generate_strong_random_pw()
@@ -365,11 +379,18 @@ def run_new(user_auth:UserAuth):
     # Insert to DB
     add_result = db_add_entry(user_auth, new_answers['new_name'], new_answers['new_id'],\
         new_answers['new_pw'], new_answers['new_url'])
+    
+    if add_result:
+        print("All changes successfully saved.")
 
     return add_result
     
-def run_delete(user_auth:UserAuth):
+def run_delete(user_auth):
     credential = get_one_entry(user_auth, prompt_search_query(), decrypt=True, to_dict=True)
+    if not credential:
+        # Stop if not found
+        return False
+    
     print_credential(user_auth, credential)
 
     delete_confirm_question = [
@@ -405,7 +426,12 @@ def prompt_commands():
             'choices': command_choices
         }
     ]
-    chosen_command = prompt(command_question)['chosen_command']
+    chosen_command = prompt(command_question)
+    try:
+        chosen_command = chosen_command['chosen_command']
+    except KeyError:
+        chosen_command = 'Quit'
+
     if chosen_command == 'Quit':
         raise KeyboardInterrupt
     return chosen_command

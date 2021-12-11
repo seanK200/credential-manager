@@ -74,21 +74,26 @@ MASTER_DB_COLUMNS = {
         'type': 'TEXT',
         'encrypted': False
     },
-    'auth_salt': {
+    'username_enc': {
         'index': 1,
+        'type': 'BLOB',
+        'encrypted': True
+    },
+    'auth_salt': {
+        'index': 2,
         'type': 'BLOB',
         'encrypted': False
     },
     'date_created': {
-        'index': 2,
+        'index': 3,
         'type': 'INTEGER',
         'encrypted': False
     },
     'date_pw_change': {
-        'index': 3,
+        'index': 4,
         'type': 'INTEGER',
         'encrypted': False
-    }
+    },
 }
 MASTER_DB_TABLE = 'pypass_users'
 

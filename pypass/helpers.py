@@ -1,17 +1,13 @@
 # Python standard Libraries
-import os, hashlib, base64, hmac, datetime, sqlite3
-from sqlite3.dbapi2 import connect
-from typing import List, Union, Tuple
+import os, hashlib, base64, datetime, sqlite3
 
 # 3rd parties
-from cryptography.fernet import Fernet, InvalidToken
 import PyInquirer as pyinq
 from PyInquirer import prompt
 
 # Local
-from params import *
-from consts import ERROR_USER_ABORT, ERROR_DATABASE_ERROR
-from masterauth import UserAuth
+from pypass.params import *
+from pypass.consts import ERROR_USER_ABORT, ERROR_DATABASE_ERROR
 
 def generate_key(pw:str, salt=None)->tuple[bytes, bytes]:
     """
@@ -41,7 +37,7 @@ def format_date_from_ts(ts:int)->str:
     dt = datetime.datetime.fromtimestamp(ts)
     return dt.strftime(date_format)
 
-def ask_yn(prompt_msg:str, default_ans:False)->bool:
+def ask_yn(prompt_msg:str, default_ans=False)->bool:
     """
     Ask a yes/no question to the user, return answer as boolean value
     """
@@ -54,7 +50,7 @@ def ask_yn(prompt_msg:str, default_ans:False)->bool:
         }
     ]
     ans = pyinq.prompt(question)
-    return ans[question]
+    return ans['question']
 
 def handle_keyboard_interrupt():
     print()
@@ -72,7 +68,7 @@ def db_create_table(conn:sqlite3.Connection, table_name:str, cols:dict, if_not_e
     sql_cols = ''
     for col_name in cols:
         sql_cols += col_name + ' '
-        sql_cols += cols[col_name].type
+        sql_cols += cols[col_name]['type']
         sql_cols += ', '
     # Remove the last trailing comma
     sql += sql_cols[:-2]
@@ -91,7 +87,7 @@ def db_connect(username, *, init=False):
         db_create_table(conn, DB_TABLE, DB_COLUMNS)
     return conn
 
-def db_add_entry(user_auth:UserAuth,\
+def db_add_entry(user_auth,\
      name:str, user_id:str, user_pw:str, url:str=''):
     """
     Add an entry into the credentials database, and returns the inserted row.
@@ -100,7 +96,7 @@ def db_add_entry(user_auth:UserAuth,\
     # SQL Query
     sql = f'INSERT INTO {DB_TABLE}'
     sql += '(name, user_id, user_pw, url, date_created, date_modified) '
-    sql += 'VALUES(?, ?, ?, ?, ?, ?, ?)'
+    sql += 'VALUES(?, ?, ?, ?, ?, ?)'
 
     # Params
     user_id_enc = user_auth.encrypt(user_id)
@@ -124,11 +120,17 @@ def db_add_entry(user_auth:UserAuth,\
 
     return True
 
-def db_update_entry(user_auth:UserAuth, entry_id:int, name:str='', user_id:str='', user_pw:str='', url:str=''):
+def db_update_entry(user_auth, entry_id:int, name:str='', user_id:str='', user_pw:str='', url:str=''):
     to_update = {}
     if name: to_update['name'] = name
-    if user_id: to_update['user_id'] = user_id
-    if user_pw: to_update['user_pw'] = user_pw
+    if user_id: 
+        if type(user_id) != bytes:
+            user_id = user_auth.encrypt(user_id)
+        to_update['user_id'] = user_id
+    if user_pw: 
+        if type(user_pw) != bytes:
+            user_pw = user_auth.encrypt(user_id)
+        to_update['user_pw'] = user_pw
     if url: to_update['url'] = url
     
     # Quit if nothing to update
@@ -164,7 +166,7 @@ def db_update_entry(user_auth:UserAuth, entry_id:int, name:str='', user_id:str='
 
     return True
 
-def db_delete_entry(user_auth:UserAuth, entry_id:int):
+def db_delete_entry(user_auth, entry_id:int):
     sql = f'DELETE FROM {DB_TABLE} WHERE entry_id=?'
     try:
         with user_auth.conn as conn:
@@ -187,26 +189,28 @@ def row_to_dict(row:list, cols=DB_COLUMNS)->dict:
 
     row_dict = dict()
     for col_name in cols:
-        row_dict[col_name] = row[cols[col_name].index]
+        row_dict[col_name] = row[cols[col_name]['index']]
     return row_dict
 
-def decrypt_row(row, user_auth:UserAuth, decrypt_pw=False, to_dict=False):
+def decrypt_row(row, user_auth, decrypt_pw=False, to_dict=False):
     """
     Decrypts a row of credentials database.
     """
     row = row_to_dict(row)
     d_row = [] # decrypted row
     for col_name, col_value in row.items():
-        decrypt_needed = DB_COLUMNS[col_name].encrypted and (decrypt_pw or col_name != 'user_pw')
+        decrypt_needed = DB_COLUMNS[col_name]['encrypted'] and \
+                            (decrypt_pw or col_name != 'user_pw') and \
+                                type(col_value) == bytes
         if decrypt_needed:
-            d_row.append(user_auth.decrypt(col_value).decode())
+            d_row.append(user_auth.decrypt(col_value).decode(HASH_ENCODING))
         else:
             d_row.append(col_value)
     if to_dict:
-        row_to_dict(d_row)
+        d_row = row_to_dict(d_row)
     return d_row
 
-def prompt_choose_one_entry(rows:list, user_auth:UserAuth, *, return_entry_id_only=False)->sqlite3.Row:
+def prompt_choose_one_entry(rows:list, user_auth, *, return_entry_id_only=False)->sqlite3.Row:
     """
     Takes multiple rows obtained from a sqlite3 query as input, 
     and prompts the user to select one. Returns the selected row.
@@ -238,13 +242,13 @@ def prompt_choose_one_entry(rows:list, user_auth:UserAuth, *, return_entry_id_on
         return chosen_entry_id
 
     for row in rows:
-        if row[DB_COLUMNS['entry_id'].index] == chosen_entry_id:
+        if row[DB_COLUMNS['entry_id']['index']] == chosen_entry_id:
             chosen_row = row
             break
     
     return chosen_row
 
-def get_multiple_entries(user_auth:UserAuth, query:str='', *, query_by:str='', decrypt=False):
+def get_multiple_entries(user_auth, query:str='', *, query_by:str='', decrypt=False):
     # If no query is supplied, ask.
     if not query:
         search_query_question = [
@@ -301,7 +305,7 @@ def get_multiple_entries(user_auth:UserAuth, query:str='', *, query_by:str='', d
 
     return rows
 
-def get_one_entry(user_auth:UserAuth, query:str, *, \
+def get_one_entry(user_auth, query:str, *, \
     query_by:str='', decrypt:bool=False, decrypt_pw:bool=False, \
         return_entry_id_only=False, to_dict=False):
     """
@@ -318,10 +322,12 @@ def get_one_entry(user_auth:UserAuth, query:str, *, \
     elif len(rows) > 0:
         row = rows[0]
     else:
-        row = []
+        # Not found
+        print(f"Found no entry for search '{query}'.")
+        return row
     
     if return_entry_id_only:
-        return row[DB_COLUMNS['entry_id'].index]
+        return row[DB_COLUMNS['entry_id']['index']]
     
     if decrypt:
         row = decrypt_row(row, user_auth, decrypt_pw)
@@ -331,7 +337,7 @@ def get_one_entry(user_auth:UserAuth, query:str, *, \
     
     return row
 
-def get_entry_by_id(user_auth:UserAuth, entry_id:int, *, \
+def get_entry_by_id(user_auth, entry_id:int, *, \
     decrypt:bool=False, decrypt_pw:bool=False, to_dict=False):
     conn = user_auth.conn
     row = []
@@ -348,5 +354,7 @@ def get_entry_by_id(user_auth:UserAuth, entry_id:int, *, \
     
     if decrypt:
         row = decrypt_row(row, user_auth, decrypt_pw, to_dict=to_dict)
+    elif to_dict:
+        row = row_to_dict(row)
     
     return row

@@ -14,7 +14,7 @@ PROMPT_RUN_AFTER_VENV_ACTIVATE = f"""A new Python virtual environment '{VENV_NAM
 Activate the new Python virtual environment with 'source {VENV_NAME}/bin/activate' and run setup again."""
 PROMPT_INSTALL_DEPS = "Continue to install dependencies?"
 PROMPT_DEFAULT_YN = "Continue?"
-PROMPT_EXIT = "Exiting..."
+PROMPT_EXIT = "Exiting setup..."
 
 SUCCESS_SETUP = "Setup success! Run Pypass by running 'python3 pypass.py'."
 
@@ -97,7 +97,7 @@ def run_setup():
             subprc_call('python3 -m pip install -U pip')
             subprc_call('python3 -m pip install -U setuptools wheel')
             subprc_call('python3 -m pip install -r requirements.txt')
-            print("Successfully installed dependencies for pypass!")
+            print("\nSuccessfully installed dependencies for pypass!")
             # Mark installation as success
             setup_success = True
     except subprocess.CalledProcessError as cpe:

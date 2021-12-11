@@ -1,18 +1,25 @@
 # Python standard libraries
-import os, sys, sqlite3
+import sys, sqlite3
 from typing import Tuple
 from hashlib import blake2b
 
 # 3rd parties
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet
 from pyfiglet import Figlet
 
 # Local
-from consts import *
-from params import *
-from helpers import *
-import masterauth
-from commands import run_commands
+if __name__ == "__main__":
+    from consts import *
+    from params import *
+    from helpers import *
+    import masterauth
+    from commands import run_commands
+else:
+    from pypass.consts import *
+    from pypass.params import *
+    from pypass.helpers import *
+    from pypass import masterauth
+    from pypass.commands import run_commands
 
 def display_splash(username):
     f = Figlet(font='slant')
@@ -23,21 +30,17 @@ def display_splash(username):
 def init()->Tuple[Fernet, sqlite3.Connection]:
     init_success = False
 
-    print("Loading PyPass...", end=" ")
+    print("Loading PyPass...")
     try:
         # Master Authentication
         user_auth = masterauth.authenticate()
-        
-        if type(user_auth) == masterauth.UserAuth:
-            init_success = True
     except sqlite3.DatabaseError:
-        init_success = False
+        user_auth = None
     except KeyboardInterrupt:
+        user_auth = None
         handle_keyboard_interrupt()
     finally:
-        if init_success:
-            print("\r")
-        else:
+        if user_auth == None:
             print(ERROR_INIT_FAIL)
             sys.exit(1)
     return user_auth
@@ -51,7 +54,8 @@ def main():
     try:
         command = ''
         while command != 'Quit':
-            command = run_commands()
+            command = run_commands(user_auth)
+            print()
     except KeyboardInterrupt:
         print("Quiting PyPass...")
     finally:

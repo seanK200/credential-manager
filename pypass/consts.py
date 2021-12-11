@@ -12,7 +12,7 @@ PROMPT_NEW_MASTER_PW = "Enter new master password: "
 PROMPT_CONFIRM_PW = "Re-enter password: "
 PROMPT_MASTER_USERNAME = "Enter PyPass username: "
 PROMPT_DEFAULT_YN = "Continue (y/n)? "
-PROMPT_MASTER_USER_CREATE = "Create a new PyPass user? (y/n)  "
+PROMPT_MASTER_USER_CREATE = "Create a new PyPass user?"
 
 PROMPT_NEW_ENTRY_TITLE = "===== Adding new credential entry =====\n"
 PROPMT_NEW_ENTRY_NAME = "[1/3] Enter service/domain name: "
@@ -97,6 +97,7 @@ ERROR_MASTER_USERNAME_DOES_NOT_EXIST = "We could not find a user with the userna
 ERROR_CREATE_PYPASS_USER_DATABASEERROR = "A DatabaseError occured while trying to create a new PyPass user."
 ERROR_CREATE_PYPASS_USER_FAIL = "Failed to create a new PyPass user due to an error."
 ERROR_MASTER_AUTH_KEYBOARD_INTERRUPT = "Master authentication aborted by user. Exit program."
+ERROR_WRONG_MASTER_PASSWORD = "Wrong master password. Please re-launch the program to try again."
 
 ERROR_NEW_ENTRY_NAME_EMPTY = "You must enter a non-empty service/domain name."
 ERROR_NEW_ENTRY_NAME_TOO_LONG = "A service/domain name must be shorter than 512 characters. Please try again."

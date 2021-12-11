@@ -1,7 +1,7 @@
 import random
 
-from params import *
-from consts import *
+from pypass.params import *
+from pypass.consts import *
 
 # Password generator
 ALPHABET_LOWER = 'abcdefghijklmnopqrstuvwxyz'
