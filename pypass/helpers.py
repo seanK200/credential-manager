@@ -2,7 +2,6 @@
 import os, hashlib, base64, datetime, sqlite3
 
 # 3rd parties
-import PyInquirer as pyinq
 from PyInquirer import prompt
 
 # Local
@@ -49,7 +48,7 @@ def ask_yn(prompt_msg:str, default_ans=False)->bool:
             'default': default_ans
         }
     ]
-    ans = pyinq.prompt(question)
+    ans = prompt(question)
     return ans['question']
 
 def handle_keyboard_interrupt():
@@ -264,7 +263,7 @@ def prompt_choose_one_entry(rows:list, user_auth, *, return_entry_id_only=False)
         }
     ]
     
-    chosen_row_txt = pyinq.prompt(question).get('chosen_row_txt', prompt_choices[0])
+    chosen_row_txt = prompt(question).get('chosen_row_txt', prompt_choices[0])
     chosen_row_idx = prompt_choices.index(chosen_row_txt)
     chosen_row = rows[chosen_row_idx]
 

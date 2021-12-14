@@ -1,7 +1,6 @@
 # Python standard libraries
 import sys, sqlite3
 from typing import Tuple
-from hashlib import blake2b
 
 # 3rd parties
 from cryptography.fernet import Fernet
