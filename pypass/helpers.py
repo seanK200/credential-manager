@@ -218,33 +218,47 @@ def prompt_choose_one_entry(rows:list, user_auth, *, return_entry_id_only=False)
     chosen_row = []  # The Chosen One
 
     # Key: Text to display in PyInquirer prompt, Value: Entry ID
-    prompt_list = dict() 
+    prompt_choices = []
 
     for row in rows:
-        row = row_to_dict(row)
+        row_dict = row_to_dict(row)
         # e.g. Github (userid001)
-        row_to_txt = f"{row['name']} ({user_auth.decrypt(row['user_id']).decode()})"
-        prompt_list[row_to_txt] = row['entry_id']
+        row_txt = f"{row_dict['name']} ({user_auth.decrypt(row_dict['user_id']).decode()})"
+        try:
+            # If there is duplicate
+            duplicate_idx = prompt_choices.index(row_txt)
+            duplicate_txt = prompt_choices[duplicate_idx]
+            duplicate_row = row_to_dict(rows[duplicate_idx])
+            # Try adding url
+            if row_dict['url'] == duplicate_row['url']:
+                # Add last modified
+                row_txt += row_dict['date_modified']
+                duplicate_txt += duplicate_row['date_modified']
+            else:
+                # Add url
+                row_txt += row_dict['url']
+                duplicate_txt += duplicate_row['url']
+        except ValueError:
+            # No duplicates, just add
+            prompt_choices.append(row_txt)
 
     # Ask user
     question = [
         {
             'type':'list',
-            'name':'chosen_row',
-            'message': 'Choose one entry (use arrow keys + ENTER):',
-            'list': prompt_list.keys()
+            'name':'chosen_row_txt',
+            'message': 'Choose one entry',
+            'choices': prompt_choices
         }
     ]
-    ans = pyinq.prompt(question)
-    chosen_entry_id = prompt_list[ans['chosen_row']]
+    
+    chosen_row_txt = pyinq.prompt(question).get('chosen_row_txt', prompt_choices[0])
+    chosen_row_idx = prompt_choices.index(chosen_row_txt)
+    chosen_row = rows[chosen_row_idx]
 
     if return_entry_id_only:
-        return chosen_entry_id
-
-    for row in rows:
-        if row[DB_COLUMNS['entry_id']['index']] == chosen_entry_id:
-            chosen_row = row
-            break
+        chosen_row = row_to_dict(chosen_row)
+        return chosen_row['entry_id']
     
     return chosen_row
 
