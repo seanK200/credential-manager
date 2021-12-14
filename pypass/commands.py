@@ -110,7 +110,7 @@ def run_view(user_auth):
         {
             'type': 'list',
             'name': 'chosen_action',
-            'message': 'Choose an action:',
+            'message': 'What do you want to do with this entry?',
             'choices': actions
         }
     ]
@@ -414,7 +414,6 @@ def prompt_commands():
         'Add new entry',
         'Edit entry',
         'Delete entry',
-        'Login Wizard',
         Separator(),
         'Quit'
     ]
