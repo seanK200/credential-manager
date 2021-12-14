@@ -103,7 +103,6 @@ def run_view(user_auth):
         'View password',
         'Login Wizard',
         Separator(),
-        'View another entry',
         'Done'
     ]
     action_question = [
@@ -114,19 +113,17 @@ def run_view(user_auth):
             'choices': actions
         }
     ]
-    chosen_action = 'View another entry'
-    while chosen_action == 'View another entry':
-        answer = prompt(action_question)
-        chosen_action = answer['chosen_action']
+    answer = prompt(action_question)
+    chosen_action = answer['chosen_action']
 
-        if chosen_action == 'Copy password':
-            user_pw = user_auth.decrypt(credential['user_pw']).decode(HASH_ENCODING)
-            pc.copy(user_pw)
-            print(PROMPT_PASSWORD_COPIED)
-        elif chosen_action == 'View password':
-            print_credential(user_auth, credential, show_pw=True)
-        elif chosen_action == 'Login Wizard':
-            run_login_wizard(user_auth, entry_id=credential['entry_id'])
+    if chosen_action == 'Copy password':
+        user_pw = user_auth.decrypt(credential['user_pw']).decode(HASH_ENCODING)
+        pc.copy(user_pw)
+        print(PROMPT_PASSWORD_COPIED)
+    elif chosen_action == 'View password':
+        print_credential(user_auth, credential, show_pw=True)
+    elif chosen_action == 'Login Wizard':
+        run_login_wizard(user_auth, entry_id=credential['entry_id'])
     
     return True
 
@@ -183,7 +180,6 @@ def run_edit(user_auth):
             'message':'Do you wish to edit this entry?',
             'choices':[
                 'Yes',
-                'No, search again.',
                 'No, quit command.'
             ]
         },
@@ -370,6 +366,8 @@ def run_new(user_auth):
     
     # Ask user
     new_answers = prompt(new_questions)
+    if 'new_name' not in new_answers:
+        raise KeyboardInterrupt
     
     print("Saving changes...")
     # Generate password if necessary
@@ -451,9 +449,9 @@ def run_commands(user_auth):
             result = run_login_wizard(user_auth)
         elif command == 'Quit':
             result = True
+        if not result:
+            print("Command failed to run.")
     except KeyboardInterrupt:
         print("Command aborted by user.")
     finally:
-        if not result:
-            print("Command failed to run.")
         return command

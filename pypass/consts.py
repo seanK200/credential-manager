@@ -122,6 +122,15 @@ ERROR_YN_RESPONSE_INVALID = "Error: Invalid response. Enter either 'y' or 'n' as
 
 ERROR_USER_ABORT = "Command execution was cancelled by user. Aborting..."
 
+ERROR_INVALID_SIGNATURE = """WARNING: Entry signature is invalid.\n
+The database has been corrputed, or someone with malicious intent \
+    may have tampered with the database.
+The information in this database entry may be incorrect, \
+    or may contain malicious information. 
+It is STRONGLY recommended to delete this credential entry from the database.
+View and use the data in this entry at your own risk.\n
+"""
+
 # TIPS
 SHOW_PW_FLAG = "(Use the '-p' or '--show-password' flag to view your password)"
 

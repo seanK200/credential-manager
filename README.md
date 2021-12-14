@@ -4,6 +4,7 @@ Python Credential Manager is a local password manager, for creating, managing an
 ## Feature Overview
 * Encrypted storage of credential data
 * Automatic generation of secure passwords
+* Signing of database entries for tamper-proofing stored data
 * Search by service name
 * 'Login Wizard' for auto filling of login forms
 

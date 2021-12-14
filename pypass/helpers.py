@@ -7,7 +7,7 @@ from PyInquirer import prompt
 
 # Local
 from pypass.params import *
-from pypass.consts import ERROR_USER_ABORT, ERROR_DATABASE_ERROR
+from pypass.consts import ERROR_USER_ABORT, ERROR_DATABASE_ERROR, ERROR_INVALID_SIGNATURE
 
 def generate_key(pw:str, salt=None)->tuple[bytes, bytes]:
     """
@@ -190,6 +190,15 @@ def row_to_dict(row:list, cols=DB_COLUMNS)->dict:
     row_dict = dict()
     for col_name in cols:
         row_dict[col_name] = row[cols[col_name]['index']]
+    
+    # Formate datetime string from timestamp
+    if 'date_created' in row_dict:
+        if type(row_dict['date_created']) == int:
+            row_dict['date_created'] = format_date_from_ts(row_dict['date_created'])
+    if 'date_modified' in row_dict:
+        if type(row_dict['date_modified']) == int:
+            row_dict['date_modified'] = format_date_from_ts(row_dict['date_modified'])
+
     return row_dict
 
 def decrypt_row(row, user_auth, decrypt_pw=False, to_dict=False):
@@ -232,12 +241,15 @@ def prompt_choose_one_entry(rows:list, user_auth, *, return_entry_id_only=False)
             # Try adding url
             if row_dict['url'] == duplicate_row['url']:
                 # Add last modified
-                row_txt += row_dict['date_modified']
-                duplicate_txt += duplicate_row['date_modified']
+                row_txt += ' ' + row_dict['date_modified']
+                duplicate_txt += ' ' + duplicate_row['date_modified']
             else:
                 # Add url
-                row_txt += row_dict['url']
-                duplicate_txt += duplicate_row['url']
+                row_txt += ' ' + row_dict['url']
+                duplicate_txt += ' ' + duplicate_row['url']
+            
+            prompt_choices.append(row_txt)
+            prompt_choices[duplicate_idx] = duplicate_txt
         except ValueError:
             # No duplicates, just add
             prompt_choices.append(row_txt)
@@ -261,6 +273,44 @@ def prompt_choose_one_entry(rows:list, user_auth, *, return_entry_id_only=False)
         return chosen_row['entry_id']
     
     return chosen_row
+
+def prompt_invalid_entry_action():
+    """
+    Asks users what to do with for a database entry with an invalid signature
+
+    (Returns)
+        The action that the user chose. Possible values are: 'delete', 'view', \
+            'mark_valid', and 'return_to_menu'
+    """
+    print(ERROR_INVALID_SIGNATURE)
+    question = [
+        {
+            'type':'list',
+            'name':'action',
+            'message':'Choose action',
+            'choices': [
+                {
+                    'name': 'Delete entry from database (recommended)',
+                    'value': 'delete'
+                },
+                {
+                    'name': 'View entry anyway (UNSAFE)',
+                    'value': 'view'
+                },
+                {
+                    'name': 'Mark entry as valid (UNSAFE)',
+                    'value': 'mark_valid'
+                },
+                {
+                    'name': 'Return to menu',
+                    'value': 'return_to_menu'
+                }
+            ]
+        }
+    ]
+    chosen_action = prompt(question).get('chosen_action', '')
+    return chosen_action
+
 
 def get_multiple_entries(user_auth, query:str='', *, query_by:str='', decrypt=False):
     # If no query is supplied, ask.
@@ -340,6 +390,27 @@ def get_one_entry(user_auth, query:str, *, \
         print(f"Found no entry for search '{query}'.")
         return row
     
+    # Verify the entry
+    verified = user_auth.verify_entry(row)
+    if not verified:
+        invalid_row= row_to_dict(row)
+        # Invalid signature. Ask user what to do
+        invalid_entry_action = prompt_invalid_entry_action()
+        if invalid_entry_action == 'delete':
+            # Delete the invalid entry
+            db_delete_entry(user_auth, invalid_row['entry_id'])
+            row = []
+        elif invalid_entry_action == 'view':
+            # View the entry
+            return row
+        elif invalid_entry_action == 'mark_valid':
+            # Mark the entry valid by re-signing it
+            user_auth.sign_entry(invalid_row['entry_id'], update_db=True)
+        elif invalid_entry_action == 'return_to_menu':
+            row = []
+
+        return row
+
     if return_entry_id_only:
         return row[DB_COLUMNS['entry_id']['index']]
     

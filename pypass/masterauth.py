@@ -124,7 +124,7 @@ class UserAuth:
         Returns True if signature is valid, and False otherwise.
         """
         row_d = row_to_dict(row)
-        good_entry_hash = self.sign_entry(row, entry_salt=row_d['entry_salt'])
+        good_entry_hash = self.sign_entry(row=row, entry_salt=row_d['entry_salt'])
         return row_d['entry_hash'] == good_entry_hash
     
     def __del__(self):
