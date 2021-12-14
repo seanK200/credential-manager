@@ -1,7 +1,6 @@
 # Python standard libraries
 import os, sqlite3
 from hashlib import blake2b
-from typing import List
 from getpass import getpass
 
 # 3rd parties

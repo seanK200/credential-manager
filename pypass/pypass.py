@@ -53,7 +53,7 @@ def main():
     display_splash(user_auth.username)
     try:
         command = ''
-        while command != 'Quit':
+        while not(command == 'Quit'):
             command = run_commands(user_auth)
             print()
     except KeyboardInterrupt:

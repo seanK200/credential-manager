@@ -1,5 +1,5 @@
 # Python standard libraries
-import platform, webbrowser, time
+import platform, webbrowser, time, os
 
 # 3rd parties
 import pyperclip as pc
@@ -11,6 +11,7 @@ from PyInquirer import prompt, Separator
 from pypass.helpers import *
 from pypass.consts import *
 from pypass.generator import generate_strong_random_pw
+from pypass.masterauth import master_db_connect
 from pypass.viewer import *
 from pypass.validators import *
 
@@ -62,7 +63,7 @@ def run_login_wizard(user_auth, query:str='', *, entry_id:int=0):
     
     if not credential:
         # Stop if not found
-        return False
+        return True
     
     user_id = user_auth.decrypt(credential['user_id']).decode(HASH_ENCODING)
     user_pw = user_auth.decrypt(credential['user_pw']).decode(HASH_ENCODING)
@@ -95,7 +96,7 @@ def run_login_wizard(user_auth, query:str='', *, entry_id:int=0):
 def run_view(user_auth):
     credential = get_one_entry(user_auth, prompt_search_query(), decrypt=True, to_dict=True)
     if not credential:
-        return False
+        return True
     
     print_credential(user_auth, credential)
     actions = [
@@ -131,7 +132,7 @@ def run_edit(user_auth):
     # show_pw = False
     credential = get_one_entry(user_auth, prompt_search_query(), decrypt=True, to_dict=True)
     if not credential:
-        return False
+        return True
     
     # Make edit choices
     edit_choices = []
@@ -387,7 +388,7 @@ def run_delete(user_auth):
     credential = get_one_entry(user_auth, prompt_search_query(), decrypt=True, to_dict=True)
     if not credential:
         # Stop if not found
-        return False
+        return True
     
     print_credential(user_auth, credential)
 
@@ -405,6 +406,40 @@ def run_delete(user_auth):
     
     return result
 
+def run_delete_user(user_auth):
+    question_confirm = [
+        {
+            'type':'confirm',
+            'name':'delete_confirmed',
+            'message':'This will delete all credentials permenantly, along with the PyPass user. Are you sure?',
+        },
+        {
+            'type':'confirm',
+            'name':'delete_confirmed_2',
+            'message':'Are you sure?',
+            'when': lambda answers: answers['delete_confirmed']
+        },
+    ]
+    answer_confirm = prompt(question_confirm)
+    delete_confirmed = answer_confirm.get("delete_confirmed", False) and answer_confirm.get("delete_confirmed_2", False)
+
+    if not delete_confirmed:
+        return True
+
+    username = user_auth.username
+    # Delete from master databse
+    master_conn = master_db_connect()
+    sql = f'DELETE FROM {MASTER_DB_TABLE} WHERE username=?'
+    with master_conn:
+        cur = master_conn.cursor()
+        cur.execute(sql, [username])
+    master_conn.close()
+    # Close DB connection
+    user_auth.conn.close()
+    # Delete the database file
+    os.remove(os.path.join(DATA_DNAME, f"{username}{DB_FILE_EXT}"))
+    return True
+    
 
 def prompt_commands():
     command_choices = [
@@ -413,6 +448,7 @@ def prompt_commands():
         'Edit entry',
         'Delete entry',
         Separator(),
+        'Delete user',
         'Quit'
     ]
     command_question = [
@@ -445,8 +481,10 @@ def run_commands(user_auth):
             result = run_edit(user_auth)
         elif command == 'Delete entry':
             result = run_delete(user_auth)
-        elif command == 'Login Wizard':
-            result = run_login_wizard(user_auth)
+        elif command == 'Delete user':
+            result = run_delete_user(user_auth)
+            if result:
+                command = 'Quit'
         elif command == 'Quit':
             result = True
         if not result:
