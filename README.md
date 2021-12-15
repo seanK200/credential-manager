@@ -1,5 +1,5 @@
 # PyPass
-PyPass is a local password manager, for creating, managing and using credentials for various services.
+PyPass is a multi-user, interactive credentials manager with local encrypted storage, database signing, and automated logins.
 
 ## Feature Overview
 * Encrypted storage of credential data
@@ -8,10 +8,16 @@ PyPass is a local password manager, for creating, managing and using credentials
 * Search by service name
 * Support automatic login (requires `sudo`)
 
-## Setup and Usage
-Run the following command in your terminal. The script will automatically install any dependencies an run the application when it is done.
+## Setup
+Run the following command in your terminal. The script will automatically install any dependencies.
 ```
-python run.py
+python pypass_setup.py
+```
+
+## Usage
+Run the program by invoking the runner code. Run it in `sudo` for full feature support (automatic login)
+```
+sudo python3 run.py
 ```
 
 ## Initial Run
