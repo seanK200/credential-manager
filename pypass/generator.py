@@ -9,12 +9,16 @@ ALPHABET_UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 NUMBERS = '0123456789'
 SPECIAL_CHARS = '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'
 
+# Generate random integer in range start ~ (end - 1)
+def generate_random_int(start, end):
+    return int(random.random() * (end - start) + start)
+
 # Probability of each type of character appearing 
 # in a randomly generated password
-PARAM_PWGEN_PROB_ALPHABET_LOWER = 30
-PARAM_PWGEN_PROB_ALPHABET_UPPER = 30
-PARAM_PWGEN_PROB_NUMBER = 25
-PARAM_PWGEN_PROB_SPECIAL_CHARS = 15
+PARAM_PWGEN_PROB_ALPHABET_LOWER = generate_random_int(20, 30)
+PARAM_PWGEN_PROB_ALPHABET_UPPER = generate_random_int(20, 30)
+PARAM_PWGEN_PROB_NUMBER = generate_random_int(20, 30)
+PARAM_PWGEN_PROB_SPECIAL_CHARS = 100 - (PARAM_PWGEN_PROB_ALPHABET_LOWER + PARAM_PWGEN_PROB_ALPHABET_UPPER + PARAM_PWGEN_PROB_NUMBER)
 
 # Length upper/lower limits for randomly generated password
 PARAM_PWGEN_MAX_LENGTH = 25
@@ -32,10 +36,6 @@ PARAM_STRONG_PW_ALPHABET_UPPER_MIN_CNT = 1
 PARAM_STRONG_PW_ALPHABET_LOWER_MIN_CNT = 1
 PARAM_STRONG_PW_NUMBER_MIN_CNT = 1
 PARAM_STRONG_PW_SPECIAL_CHARS_MIN_CNT = 1
-
-# Generate random integer in range start ~ (end - 1)
-def generate_random_int(start, end):
-    return int(random.random() * end + start)
 
 # Randomly select one element from an iterable or string
 def select_one_random(iter):

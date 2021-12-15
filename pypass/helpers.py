@@ -142,7 +142,7 @@ def db_update_entry(user_auth, entry_id:int, name:str='', user_id:str='', user_p
         sql += f"{k}=?, "
         sql_params.append(v)
     sql = sql[:-2] # Drop last trailing comma
-    sql += 'WHERE entry_id=?'
+    sql += ' WHERE entry_id=?'
     sql_params.append(entry_id)
 
     # Execute query
