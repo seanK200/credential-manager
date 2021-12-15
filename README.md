@@ -29,3 +29,13 @@ Choose action:
   Delete user
   Quit
 ```
+
+## License
+* MIT as the overall license (See LICENSE)
+* Multiple other secondary permissive or copyleft linceses for third-party components. Check all license files in the depedent projects' repositories (linked below) before usage of pypass.
+  * [pyca/cryptography](https://github.com/pyca/cryptography): Either Apache or BSD 3-Clause
+  * [boppreh/keyboard](https://github.com/boppreh/keyboard): MIT
+  * [asweigart/pyperclip](https://github.com/asweigart/pyperclip): BSD 3-Clause
+  * [pwaller/pyfiglet](https://github.com/pwaller/pyfiglet): MIT
+  * [willmcgugan/rich](https://github.com/willmcgugan/rich): MIT
+  * [CITGuru/PyInquirer](https://github.com/CITGuru/PyInquirer): MIT
