@@ -1,12 +1,12 @@
-# Python Credential Manager
-Python Credential Manager is a local password manager, for creating, managing and using credentials for various services.
+# PyPass
+PyPass is a local password manager, for creating, managing and using credentials for various services.
 
 ## Feature Overview
 * Encrypted storage of credential data
 * Automatic generation of secure passwords
 * Signing of database entries for tamper-proofing stored data
 * Search by service name
-* 'Login Wizard' for auto filling of login forms
+* Support automatic login (requires `sudo`)
 
 ## Setup and Usage
 Run the following command in your terminal. The script will automatically install any dependencies an run the application when it is done.
@@ -25,7 +25,7 @@ Choose action:
   Add new entry
   Edit entry
   Delete entry
-  Login Wizard
   --------------
+  Delete user
   Quit
 ```
